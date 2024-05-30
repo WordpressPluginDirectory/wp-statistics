@@ -1,8 +1,9 @@
 <?php
 
 namespace WP_STATISTICS;
+use WP_Statistics\Components\Singleton;
 
-class taxonomies_page
+class taxonomies_page extends Singleton
 {
     private static $taxonomies = [];
     private static $defaultTaxonomies = [];
@@ -83,7 +84,7 @@ class taxonomies_page
             $link  = Menus::admin_url('wps_taxonomies_page', ['taxonomy' => $slug]);
             if (!in_array($slug, self::$defaultTaxonomies)) {
                 $class .= ' wps-locked';
-                $link  = sprintf('%s/product/wp-statistics-data-plus?utm_source=wp_statistics&utm_medium=display&utm_campaign=wordpress', WP_STATISTICS_SITE_URL);
+                $link  = sprintf('%s/product/wp-statistics-data-plus?utm_source=wp-statistics&utm_medium=link&utm_campaign=dp-ctax', WP_STATISTICS_SITE_URL);
             }
             $args['tabs'][] = [
                 'link'  => $link,
@@ -98,7 +99,7 @@ class taxonomies_page
 
             // Set Type List
             $args['top_list_type'] = self::$taxonomy;
-            $args['top_title']     = sprintf(__('Top %s Sorted by Visits', 'wp-statistics'), strtolower($taxonomyTitle));
+            $args['top_title']     = sprintf(__('Top %s Sorted by Views', 'wp-statistics'), strtolower($taxonomyTitle));
 
             // Push List Category
             foreach ($terms as $term) {
@@ -110,7 +111,7 @@ class taxonomies_page
 
             // Set Type List
             $args['top_list_type'] = $taxonomy->object_type;
-            $args['top_title']     = sprintf(__('%1$s: %2$s Most Popular Posts by Visits', 'wp-statistics'), $taxonomyTitle, ucfirst($term->name));
+            $args['top_title']     = sprintf(__('%1$s: %2$s Most Popular Posts by Views', 'wp-statistics'), $taxonomyTitle, ucfirst($term->name));
 
             // Set Title
             $args['title']      = sprintf(__('%1$s: %2$s Statistics', 'wp-statistics'), $taxonomyTitle, ucfirst($term->name));
@@ -156,7 +157,7 @@ class taxonomies_page
             $args['total_posts_visits_in_taxonomy'] = $total_posts_visits_in_taxonomy;
         }
 
-        // Sort By Visit Count
+        // Sort By View Count
         Helper::SortByKeyValue($args['top_list'], 'count_visit');
 
         // Get Only 5 Item
@@ -165,9 +166,11 @@ class taxonomies_page
             $args['top_list'] = $args['top_list'][0];
         }
 
+        $args['DateRang']    = Admin_Template::DateRange();
+        $args['HasDateRang'] = True;
         // Show Template Page
         Admin_Template::get_template(array('layout/header', 'layout/tabbed-page-header', 'pages/taxonomies', 'layout/postbox.hide', 'layout/footer'), $args);
     }
 }
 
-new taxonomies_page;
+taxonomies_page::instance();

@@ -1,8 +1,9 @@
 <?php
 
 namespace WP_STATISTICS;
+use WP_Statistics\Components\Singleton;
 
-class platform_page
+class platform_page extends Singleton
 {
 
     public function __construct()
@@ -34,7 +35,7 @@ class platform_page
     {
 
         // Page title
-        $args['title'] = __('User Platform Usage Statistics', 'wp-statistics');
+        $args['title'] = __('User Operating System Usage Statistics', 'wp-statistics');
 
         // Get Current Page Url
         $args['pageName']   = Menus::get_page_slug('platform');
@@ -51,4 +52,4 @@ class platform_page
 
 }
 
-new platform_page;
+platform_page::instance();

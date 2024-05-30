@@ -5,6 +5,7 @@ namespace WP_Statistics\Service\Analytics;
 use WP_STATISTICS\GeoIP;
 use WP_STATISTICS\Helper;
 use WP_STATISTICS\IP;
+use WP_STATISTICS\Option;
 use WP_STATISTICS\Pages;
 use WP_STATISTICS\Referred;
 use WP_STATISTICS\User;
@@ -68,10 +69,28 @@ class VisitorProfile
     public function getCity()
     {
         if (!$this->city) {
-            $this->city = GeoIP::getCity($this->getIp());
+            $this->city = GeoIP::getCity($this->getIp(), true);
         }
 
-        return $this->city;
+        return $this->city['city'];
+    }
+
+    public function getRegion()
+    {
+        if (!$this->city) {
+            $this->city = GeoIP::getCity($this->getIp(), true);
+        }
+
+        return $this->city['region'];
+    }
+
+    public function getContinent()
+    {
+        if (!$this->city) {
+            $this->city = GeoIP::getCity($this->getIp(), true);
+        }
+
+        return $this->city['continent'];
     }
 
     public function getReferrer()
@@ -113,7 +132,11 @@ class VisitorProfile
     public function getUserId()
     {
         if (!$this->userId) {
-            $this->userId = User::get_user_id();
+            if (!Option::get('visitors_log')) {
+                $this->userId = 0;
+            } else {
+                $this->userId = User::get_user_id();
+            }
         }
 
         return $this->userId;

@@ -58,6 +58,7 @@ class Option
             'geoip_license_key'       => '',
             'content_report'          => Admin_Template::get_template('emails/default', array(), true),
             'update_geoip'            => true,
+            'privacy_audit'           => true,
             'store_ua'                => false,
             'do_not_track'            => true,
             'exclude_administrator'   => true,
@@ -267,7 +268,7 @@ class Option
         }
 
         if (!array_key_exists($option_name, $options)) {
-            return $default ? $default : false;
+            return !is_null($default) ? $default : false;
         }
 
         return apply_filters("wp_statistics_option_{$setting_name}_{$option_name}", $options[$option_name]);

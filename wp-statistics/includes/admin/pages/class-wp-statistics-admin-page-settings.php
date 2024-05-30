@@ -2,7 +2,9 @@
 
 namespace WP_STATISTICS;
 
-class settings_page
+use WP_Statistics\Components\Singleton;
+
+class settings_page extends Singleton
 {
 
     private static $redirectAfterSave = true;
@@ -101,6 +103,9 @@ class settings_page
                 }
             }
 
+            // Trigger Save Settings Action
+            do_action('wp_statistics_save_settings');
+
             // Get tab name for redirect to the current tab
             $tab = isset($_POST['tab']) && $_POST['tab'] ? sanitize_text_field($_POST['tab']) : 'general-settings';
 
@@ -162,6 +167,7 @@ class settings_page
         $wps_option_list = array(
             'wps_anonymize_ips',
             'wps_hash_ips',
+            'wps_privacy_audit',
             'wps_store_ua',
             'wps_do_not_track',
         );
@@ -193,8 +199,13 @@ class settings_page
                 if (wp_next_scheduled('wp_statistics_report_hook')) {
                     wp_unschedule_event(wp_next_scheduled('wp_statistics_report_hook'), 'wp_statistics_report_hook');
                 }
-
-                wp_schedule_event(time(), sanitize_text_field($_POST['wps_time_report']), 'wp_statistics_report_hook');
+                $timeReports         = sanitize_text_field($_POST['wps_time_report']);
+                $schedulesInterval   = wp_get_schedules();
+                $timeReportsInterval = 86400;
+                if (isset($schedulesInterval[$timeReports]['interval'])) {
+                    $timeReportsInterval = $schedulesInterval[$timeReports]['interval'];
+                }
+                wp_schedule_event(time() + $timeReportsInterval, $timeReports, 'wp_statistics_report_hook');
             }
         }
 
@@ -461,15 +472,12 @@ class settings_page
             'wps_visitors_log',
             'wps_enable_user_column',
             'wps_pages',
-            'wps_track_all_pages',
             'wps_use_cache_plugin',
-            'wps_hit_post_metabox',
             'wps_show_hits',
             'wps_display_hits_position',
             'wps_check_online',
             'wps_menu_bar',
             'wps_coefficient',
-            'wps_chart_totals',
             'wps_hide_notices'
         );
 
@@ -478,15 +486,10 @@ class settings_page
             $wp_statistics_options[self::input_name_to_option($option)] = $optionValue;
         }
 
-        // Save Visits Column & Visit Chart Metabox
+        // Save Views Column & View Chart Metabox
         foreach (array('wps_disable_column', 'wps_disable_editor') as $option) {
             $wps_disable_column                                         = isset($_POST[$option]) && sanitize_text_field($_POST[$option]) == '1' ? '' : '1';
             $wp_statistics_options[self::input_name_to_option($option)] = $wps_disable_column;
-        }
-
-        //Add Visitor RelationShip Table
-        if (isset($_POST['wps_visitors_log']) and $_POST['wps_visitors_log'] == 1) {
-            Install::create_visitor_relationship_table();
         }
 
         //Flush Rewrite Use Cache Plugin
@@ -507,7 +510,7 @@ class settings_page
     {
         $options = [];
         foreach ($addon_options as $option_name => $option_value) {
-            if ($option_name == 'wps_about_widget_content') {
+            if (in_array($option_name, ['wps_about_widget_content', 'email_content_header', 'email_content_footer'])) {
                 $options[$option_name] = wp_kses_post($option_value);
             } else {
                 if (is_array($option_value)) {
@@ -566,4 +569,4 @@ class settings_page
     }
 }
 
-new settings_page;
+settings_page::instance();

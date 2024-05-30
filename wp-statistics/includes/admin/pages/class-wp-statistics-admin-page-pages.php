@@ -1,8 +1,9 @@
 <?php
 
 namespace WP_STATISTICS;
+use WP_Statistics\Components\Singleton;
 
-class pages_page
+class pages_page extends Singleton
 {
 
     const ITEM_PER_PAGE = 20;
@@ -123,6 +124,7 @@ class pages_page
 
             // Get Date-Range
             $args['DateRang'] = Admin_Template::DateRange();
+            $args['HasDateRang'] = True;
 
             // Custom Get List
             $args['custom_get'] = [
@@ -147,7 +149,7 @@ class pages_page
 
                 if (!in_array($postTypeSlug, self::$defaultPostTypes)) {
                     $class .= ' wps-locked';
-                    $link  = sprintf('%s/product/wp-statistics-data-plus?utm_source=wp_statistics&utm_medium=display&utm_campaign=wordpress', WP_STATISTICS_SITE_URL);
+                    $link  = sprintf('%s/product/wp-statistics-data-plus?utm_source=wp-statistics&utm_medium=link&utm_campaign=dp-cpt', WP_STATISTICS_SITE_URL);
                 }
 
                 $object = get_post_type_object($slug);
@@ -286,4 +288,4 @@ class pages_page
     }
 }
 
-new pages_page;
+pages_page::instance();

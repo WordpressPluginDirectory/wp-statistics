@@ -89,7 +89,13 @@ class Schedule
 
         // Add the report schedule if it doesn't exist and is enabled.
         if (!wp_next_scheduled('wp_statistics_report_hook') && Option::get('stats_report')) {
-            wp_schedule_event(time(), Option::get('time_report'), 'wp_statistics_report_hook');
+            $timeReports = Option::get('time_report');
+            $schedulesInterval = wp_get_schedules();
+            $timeReportsInterval = 86400;
+            if (isset($schedulesInterval[$timeReports]['interval'])) {
+                $timeReportsInterval = $schedulesInterval[$timeReports]['interval'];
+            }
+            wp_schedule_event(time() + $timeReportsInterval, $timeReports, 'wp_statistics_report_hook');
         }
 
         // Remove the report schedule if it does exist and is disabled.
@@ -241,6 +247,11 @@ class Schedule
             $final_report_text = apply_filters('wp_statistics_final_text_report_email', $email_content);
 
             /**
+             * Filter to modify email subject
+             */
+            $email_subject = apply_filters('wp_statistics_report_email_subject', __('Statistical reporting', 'wp-statistics'));
+
+            /**
              * Filter for enable/disable sending email by template.
              */
             $email_template = apply_filters('wp_statistics_report_email_template', true);
@@ -255,7 +266,7 @@ class Schedule
              */
             $result_email = Helper::send_mail(
                 $email_receivers,
-                __('Statistical reporting', 'wp-statistics'),
+                $email_subject,
                 $final_report_text,
                 $email_template
             );
@@ -268,8 +279,9 @@ class Schedule
         }
 
         // If SMS
-        if ($type == 'sms' and function_exists('wp_sms_send')) {
-            wp_sms_send(array(get_option('wp_admin_mobile')), $final_text_report);
+        if ($type == 'sms' and function_exists('wp_sms_send') and class_exists('\WP_SMS\Option')) {
+            $adminMobileNumber = \WP_SMS\Option::getOption('admin_mobile_number');
+            wp_sms_send($adminMobileNumber, $email_content);
         }
     }
 

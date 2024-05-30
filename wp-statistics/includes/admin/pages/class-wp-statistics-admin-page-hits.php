@@ -1,8 +1,9 @@
 <?php
 
 namespace WP_STATISTICS;
+use WP_Statistics\Components\Singleton;
 
-class hits_page
+class hits_page extends Singleton
 {
 
     public function __construct()
@@ -31,7 +32,7 @@ class hits_page
     {
 
         // Page title
-        $args['title'] = __('Visit Statistics', 'wp-statistics');
+        $args['title'] = __('View Statistics', 'wp-statistics');
 
         // Get Current Page Url
         $args['pageName']   = Menus::get_page_slug('hits');
@@ -41,7 +42,7 @@ class hits_page
         $args['DateRang']    = Admin_Template::DateRange();
         $args['HasDateRang'] = True;
 
-        // Get Total Visits and Visitors
+        // Get Total Views and Visitors
         $args['total_visits']   = (Option::get('visits') ? wp_statistics_visit('total') : 0);
         $args['total_visitors'] = (Option::get('visitors') ? wp_statistics_visitor('total', null, true) : 0);
 
@@ -51,4 +52,4 @@ class hits_page
 
 }
 
-new hits_page;
+hits_page::instance();

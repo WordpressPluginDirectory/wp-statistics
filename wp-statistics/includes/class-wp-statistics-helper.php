@@ -705,7 +705,7 @@ class Helper
      */
     public static function getUrlDecode($value)
     {
-        return utf8_decode(urldecode($value));
+        return mb_convert_encoding(urldecode($value), 'ISO-8859-1', 'UTF-8');
     }
 
     /**
@@ -777,13 +777,15 @@ class Helper
     {
         // Email Template
         if ($email_template) {
-            $email_template = wp_normalize_path(WP_STATISTICS_DIR . 'includes/admin/templates/emails/layout.php');
+            $email_template = WP_STATISTICS_DIR . 'includes/admin/templates/emails/layout.php';
+            $email_template = apply_filters('wp_statistics_email_template_layout', $email_template);
+            $email_template = wp_normalize_path($email_template);
         }
 
-        // Email from
-        $from_name  = get_bloginfo('name');
-        $from_email = get_bloginfo('admin_email');
-        $from       = sprintf('%s <%s>', $from_name, $from_email);
+        // Sent from
+//        $from_name  = get_bloginfo('name');
+//        $from_email = get_bloginfo('admin_email');
+//        $from       = sprintf('%s <%s>', $from_name, $from_email);
 
         //Template Arg
         $template_arg = array(
@@ -793,7 +795,7 @@ class Helper
             'site_url'     => home_url(),
             'site_title'   => get_bloginfo('name'),
             'footer_text'  => '',
-            'email_title'  => apply_filters('wp_statistics_email_title', __('Email from', 'wp-statistics') . ' ' . wp_parse_url(get_site_url())['host']),
+            'email_title'  => apply_filters('wp_statistics_email_title', __('Sent from', 'wp-statistics') . ' ' . wp_parse_url(get_site_url())['host']),
             'logo_image'   => apply_filters('wp_statistics_email_logo', WP_STATISTICS_URL . 'assets/images/logo-statistics-header-blue.png'),
             'logo_url'     => apply_filters('wp_statistics_email_logo_url', get_bloginfo('url')),
             'copyright'    => apply_filters('wp_statistics_email_footer_copyright', Admin_Template::get_template('emails/copyright', array(), true)),
@@ -809,7 +811,6 @@ class Helper
         try {
 
             WP_Statistics_Mail::init()
-                ->setFrom($from)
                 ->setTo($to)
                 ->setSubject($subject)
                 ->setBody($content)
@@ -986,9 +987,9 @@ class Helper
      */
     public static function compare_uri_hits_int($a, $b)
     {
-        if ($a[1] == $b[1]) return 0;
-        if ($a[1] > $b[1]) return 1;
-        if ($a[1] < $b[1]) return -1;
+        if ($b[1] == $a[1]) return 0;
+        if ($b[1] > $a[1]) return 1;
+        if ($b[1] < $a[1]) return -1;
 
     }
 
@@ -1218,9 +1219,6 @@ class Helper
     {
         // Create Empty Params Object
         $params = array();
-
-        //track all page
-        $params['track_all'] = (Pages::is_track_all_page() === true ? 1 : 0);
 
         //Set Page Type
         $get_page_type               = Pages::get_page_type();

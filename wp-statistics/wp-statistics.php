@@ -3,8 +3,8 @@
  * Plugin Name: WP Statistics
  * Plugin URI: https://wp-statistics.com/
  * GitHub Plugin URI: https://github.com/wp-statistics/wp-statistics
- * Description: This plugin gives you the complete information on your website's visitors.
- * Version: 14.6.3
+ * Description: Get website traffic insights with GDPR/CCPA compliant, privacy-friendly analytics. Includes visitor data, stunning graphs, and no data sharing.
+ * Version: 14.7.1
  * Author: VeronaLabs
  * Author URI: https://veronalabs.com/
  * Text Domain: wp-statistics

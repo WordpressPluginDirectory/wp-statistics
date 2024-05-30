@@ -118,7 +118,7 @@ class UserOnline
         } else {
 
             # Update current User Time
-            self::update_user_online($visitorProfile);
+            self::update_user_online($visitorProfile, $args);
 
         }
     }
@@ -142,7 +142,7 @@ class UserOnline
      * Add User Online to Database
      *
      * @param array $args
-     * @param $visitorProfile VisitorProfile
+     * @param VisitorProfile $visitorProfile
      * @throws \Exception
      */
     public static function add_user_online($visitorProfile, $args = array())
@@ -151,6 +151,8 @@ class UserOnline
 
         $current_page = $visitorProfile->getCurrentPageType();
         $user_agent   = $visitorProfile->getUserAgent();
+
+        $pageId = Pages::getPageId($current_page['type'], $current_page['id']);
 
         //Prepare User online Data
         $user_online = array(
@@ -163,9 +165,11 @@ class UserOnline
             'platform'  => $user_agent['platform'],
             'version'   => $user_agent['version'],
             'location'  => $visitorProfile->getCountry(),
+            'region'    => $visitorProfile->getRegion(),
+            'continent' => $visitorProfile->getContinent(),
             'city'      => $visitorProfile->getCity(),
             'user_id'   => $visitorProfile->getUserId(),
-            'page_id'   => $current_page['id'],
+            'page_id'   => $pageId,
             'type'      => $current_page['type']
         );
         $user_online = apply_filters('wp_statistics_user_online_information', wp_parse_args($args, $user_online));
@@ -193,12 +197,14 @@ class UserOnline
      * Update User Online
      * @param $visitorProfile VisitorProfile
      */
-    public static function update_user_online($visitorProfile)
+    public static function update_user_online($visitorProfile, $args = array())
     {
         global $wpdb;
 
         $current_page = $visitorProfile->getCurrentPageType();
         $user_id      = $visitorProfile->getUserId();
+
+        $pageId = Pages::getPageId($current_page['type'], $current_page['id']);
 
         //Prepare User online Update data
         $user_online = array(
@@ -206,10 +212,10 @@ class UserOnline
             'date'      => TimeZone::getCurrentDate(),
             'referred'  => $visitorProfile->getReferrer(),
             'user_id'   => $user_id,
-            'page_id'   => $current_page['id'],
+            'page_id'   => $pageId,
             'type'      => $current_page['type']
         );
-        $user_online = apply_filters('wp_statistics_update_user_online_data', $user_online);
+        $user_online = apply_filters('wp_statistics_update_user_online_data', wp_parse_args($args, $user_online));
 
         # Update the database with the new information.
         $wpdb->update(DB::table('useronline'), $user_online, array(
@@ -299,7 +305,7 @@ class UserOnline
             }
 
             // Page info
-            $item['page'] = Pages::get_page_info($items->page_id, $items->type);
+            $item['page'] = Visitor::get_page_by_id($items->page_id);
 
             // Push Browser
             $item['browser'] = array(
@@ -323,7 +329,8 @@ class UserOnline
 
             // Push City
             if (GeoIP::active('city')) {
-                $item['city'] = !empty($items->city) ? $items->city : GeoIP::getCity($ip);
+                $item['city']   = !empty($items->city) ? $items->city : GeoIP::getCity($ip);
+                $item['region'] = $items->region;
             }
 
             // Online For Time

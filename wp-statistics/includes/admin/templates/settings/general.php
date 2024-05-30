@@ -46,7 +46,7 @@
 
         <tr valign="top">
             <th scope="row">
-                <label for="visits"><?php esc_html_e('Track Page Views', 'wp-statistics'); ?></label>
+                <label for="visits"><?php esc_html_e('Track Views', 'wp-statistics'); ?></label>
             </th>
 
             <td>
@@ -58,7 +58,7 @@
 
         <tr valign="top" id="visitors_tr">
             <th scope="row">
-                <label for="visitors"><?php esc_html_e('Monitor Unique Visitors', 'wp-statistics'); ?></label>
+                <label for="visitors"><?php esc_html_e('Track Unique Visitors', 'wp-statistics'); ?></label>
             </th>
             <td>
                 <input id="visitors" type="checkbox" value="1" name="wps_visitors" <?php echo WP_STATISTICS\Option::get('visitors') == true ? "checked='checked'" : ''; ?>>
@@ -69,7 +69,12 @@
 
         <tr valign="top" data-view="visitors_log_tr" <?php echo(WP_STATISTICS\Option::get('visitors') == false ? 'style="display:none;"' : '') ?>>
             <th scope="row">
-                <label for="visitors_log"><?php esc_html_e('Record User Page Visits', 'wp-statistics'); ?></label>
+                <label for="visitors_log">
+                    <?php esc_html_e('Record User Page Views', 'wp-statistics'); ?>
+                </label>
+                <?php if (\WP_STATISTICS\Option::get('privacy_audit')): ?>
+                    <a href="#" class="wps-tooltip" title="<?php esc_html_e('Privacy Impact - This setting affects user privacy. Adjust with caution to ensure compliance with privacy standards. For more details, visit the Privacy Audit page.', 'wp-statistics') ?>"><i class="wps-tooltip-icon privacy"></i></a>
+                <?php endif ?>
             </th>
             <td>
                 <input id="visitors_log" type="checkbox" value="1" name="wps_visitors_log" <?php echo WP_STATISTICS\Option::get('visitors_log') == true ? "checked='checked'" : ''; ?>>
@@ -81,46 +86,14 @@
 
         <tr valign="top" data-view="visitors_log_tr" <?php echo(WP_STATISTICS\Option::get('visitors') == false ? 'style="display:none;"' : '') ?>>
             <th scope="row">
-                <label for="enable_user_column"><?php esc_html_e('Display User Visit Logs', 'wp-statistics'); ?></label>
+                <label for="enable_user_column"><?php esc_html_e('Display User View Logs', 'wp-statistics'); ?></label>
             </th>
             <td>
                 <input id="enable_user_column" type="checkbox" value="1" name="wpsesc_html_enable_user_column" <?php echo WP_STATISTICS\Option::get('enable_user_column') == true ? "checked='checked'" : ''; ?>>
-                <label for="enable_user_column"><?php esc_html_e('Show Visit Logs', 'wp-statistics'); ?></label>
-                <p class="description"><?php esc_html_e('Adds a column in the WordPress admin\'s user list to display a log of user visits.', 'wp-statistics'); ?></p>
+                <label for="enable_user_column"><?php esc_html_e('Show View Logs', 'wp-statistics'); ?></label>
+                <p class="description"><?php esc_html_e('Adds a column in the WordPress admin\'s user list to display a log of user views.', 'wp-statistics'); ?></p>
             </td>
         </tr>
-        </tbody>
-    </table>
-</div>
-<div class="postbox">
-    <table class="form-table">
-        <tbody>
-        <tr valign="top">
-            <th scope="row" colspan="2"><h3><?php esc_html_e('Content Engagement Metrics', 'wp-statistics'); ?></h3></th>
-        </tr>
-
-        <tr valign="top">
-            <th scope="row">
-                <label for="pages"><?php esc_html_e('Count Page Visits', 'wp-statistics'); ?></label>
-            </th>
-            <td>
-                <input id="pages" type="checkbox" value="1" name="wps_pages" <?php echo WP_STATISTICS\Option::get('pages') == true ? "checked='checked'" : ''; ?>>
-                <label for="pages"><?php esc_html_e('Enable', 'wp-statistics'); ?></label>
-                <p class="description"><?php esc_html_e('Tracks how many times each individual page is visited.', 'wp-statistics'); ?></p>
-            </td>
-        </tr>
-
-        <tr valign="top">
-            <th scope="row">
-                <label for="all_pages"><?php esc_html_e('Monitor All Content Types', 'wp-statistics'); ?></label>
-            </th>
-            <td>
-                <input id="all_pages" type="checkbox" value="1" name="wps_track_all_pages" <?php echo WP_STATISTICS\Option::get('track_all_pages') == true ? "checked='checked'" : ''; ?>>
-                <label for="all_pages"><?php esc_html_e('Enable', 'wp-statistics'); ?></label>
-                <p class="description"><?php _e('Tracks visitor data for custom post types in addition to standard posts and pages. To access more detailed statistics for custom post types, download the <a href="https://wp-statistics.com/product/wp-statistics-data-plus/?utm_source=wp-statistics&utm_medium=link&utm_campaign=settings">DataPlus add-on</a>.', 'wp-statistics'); // phpcs:ignore WordPress.Security.EscapeOutput.UnsafePrintingFunction	 ?></p>
-            </td>
-        </tr>
-
         </tbody>
     </table>
 </div>
@@ -132,11 +105,11 @@
         </tr>
         <tr valign="top">
             <th scope="row">
-                <label for="disable-editor"><?php esc_html_e('Visits Chart Metabox', 'wp-statistics'); ?></label>
+                <label for="disable-editor"><?php esc_html_e('Chart Metabox Views', 'wp-statistics'); ?></label>
             </th>
 
             <td>
-                <input id="disable-editor" type="checkbox" value="1" name="wps_disableesc_html_editor" <?php echo WP_STATISTICS\Option::get('disableesc_html_editor') == '1' ? '' : "checked='checked'"; ?>>
+                <input id="disable-editor" type="checkbox" value="1" name="wps_disable_editor" <?php echo WP_STATISTICS\Option::get('disable_editor') == '1' ? '' : "checked='checked'"; ?>>
                 <label for="disable-editor"><?php esc_html_e('Enable', 'wp-statistics'); ?></label>
                 <p class="description"><?php esc_html_e('Shows content view statistics in a graphical format when editing.', 'wp-statistics'); ?></p>
             </td>
@@ -144,7 +117,7 @@
 
         <tr valign="top">
             <th scope="row">
-                <label for="disable_column"><?php esc_html_e('Visits Column', 'wp-statistics'); ?></label>
+                <label for="disable_column"><?php esc_html_e('Views Column', 'wp-statistics'); ?></label>
             </th>
             <td>
                 <input id="disable_column" type="checkbox" value="1" name="wps_disable_column" <?php echo WP_STATISTICS\Option::get('disable_column') == '1' ? '' : "checked='checked'"; ?>>
@@ -155,34 +128,17 @@
 
         <tr valign="top">
             <th scope="row">
-                <label for="hit_post_metabox"><?php esc_html_e('Visits in Publish Metabox', 'wp-statistics'); ?></label>
+                <label for="show_hits"><?php esc_html_e('Views in Single Contents', 'wp-statistics'); ?></label>
             </th>
 
             <td>
-                <input id="hit_post_metabox" type="checkbox" value="1" name="wps_hit_post_metabox" <?php echo WP_STATISTICS\Option::get('hit_post_metabox') == true ? "checked='checked'" : ''; ?>>
-                <label for="hit_post_metabox"><?php esc_html_e('Enable', 'wp-statistics'); ?></label>
-                <p class="description"><?php esc_html_e('Presents a snapshot of content views in the publish box for quick reference.', 'wp-statistics'); ?></p>
-            </td>
-        </tr>
-
-        <tr valign="top">
-            <th scope="row">
-                <label for="show_hits"><?php esc_html_e('Visits in Single Pages', 'wp-statistics'); ?></label>
-            </th>
-
-            <td>
-                <input id="show_hits" type="checkbox" value="1" name="wps_show_hits" <?php echo WP_STATISTICS\Option::get('show_hits') == true ? "checked='checked'" : ''; ?> onClick='ToggleShowHitsOptions();'>
+                <input id="show_hits" type="checkbox" value="1" name="wps_show_hits" <?php echo WP_STATISTICS\Option::get('show_hits') ? "checked='checked'" : ''; ?> onClick='ToggleShowHitsOptions();'>
                 <label for="show_hits"><?php esc_html_e('Enable', 'wp-statistics'); ?></label>
                 <p class="description"><?php esc_html_e('Shows the view count on the content\'s page for visitor insight.', 'wp-statistics'); ?></p>
             </td>
         </tr>
 
-        <?php if (WP_STATISTICS\Option::get('show_hits')) {
-            $hidden = "";
-        } else {
-            $hidden = " style='display: none;'";
-        } ?>
-        <tr valign="top"<?php echo esc_html($hidden); ?> id='wps_show_hits_option'>
+        <tr valign="top" <?php echo  WP_STATISTICS\Option::get('show_hits') ?   'style="display: table-row"' :   'style="display: none"' ?> id='wps_show_hits_option'>
             <th scope="row" style="vertical-align: top;">
                 <label for="display_hits_position"><?php esc_html_e('Display position', 'wp-statistics'); ?></label>
             </th>
@@ -193,7 +149,7 @@
                     <option value="before_content" <?php selected(WP_STATISTICS\Option::get('display_hits_position'), 'before_content'); ?>><?php esc_html_e('Before Content', 'wp-statistics'); ?></option>
                     <option value="after_content" <?php selected(WP_STATISTICS\Option::get('display_hits_position'), 'after_content'); ?>><?php esc_html_e('After Content', 'wp-statistics'); ?></option>
                 </select>
-                <p class="description"><?php esc_html_e('Choose the position to show Visits.', 'wp-statistics'); ?></p>
+                <p class="description"><?php esc_html_e('Choose the position to show views.', 'wp-statistics'); ?></p>
             </td>
         </tr>
         </tbody>
@@ -295,27 +251,6 @@
                 </td>
             </tr>
         <?php } ?>
-        </tbody>
-    </table>
-</div>
-<div class="postbox">
-    <table class="form-table">
-        <tbody>
-        <tr valign="top">
-            <th scope="row" colspan="2"><h3><?php esc_html_e('Graphical Data Presentation', 'wp-statistics'); ?></h3></th>
-        </tr>
-
-        <tr valign="top">
-            <th scope="row">
-                <label for="chart-totals"><?php esc_html_e('Include Totals in Charts', 'wp-statistics'); ?></label>
-            </th>
-            <td>
-                <input id="chart-totals" type="checkbox" value="1" name="wps_chart_totals" <?php echo WP_STATISTICS\Option::get('chart_totals') == true ? "checked='checked'" : ''; ?>>
-                <label for="chart-totals"><?php esc_html_e('Enable', 'wp-statistics'); ?></label>
-                <p class="description"><?php esc_html_e('For charts that represent multiple values, show the combined amount of all items at the bottom.', 'wp-statistics'); ?></p>
-            </td>
-        </tr>
-
         </tbody>
     </table>
 </div>

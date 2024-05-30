@@ -1,8 +1,9 @@
 <?php
 
 namespace WP_STATISTICS;
+use WP_Statistics\Components\Singleton;
 
-class authors_page
+class authors_page extends Singleton
 {
 
     public function __construct()
@@ -60,7 +61,7 @@ class authors_page
 
             // Set Type List
             $args['top_list_type'] = 'user';
-            $args['top_title']     = __('Top Authors by Page Visits', 'wp-statistics');
+            $args['top_title']     = __('Top Authors by Page Views', 'wp-statistics');
 
             // Push List Category
             foreach ($users as $user) {
@@ -71,7 +72,7 @@ class authors_page
 
             // Set Type List
             $args['top_list_type'] = 'post';
-            $args['top_title']     = __('Author’s Top Posts by Visits', 'wp-statistics');
+            $args['top_title']     = __('Author’s Top Posts by Views', 'wp-statistics');
 
             // Get Top Posts From Category
             $post_lists = Helper::get_post_list(array(
@@ -84,7 +85,7 @@ class authors_page
 
         }
 
-        // Sort By Visit Count
+        // Sort By View Count
         Helper::SortByKeyValue($args['top_list'], 'count_visit');
 
         $author_items = apply_filters('wp_statistics_author_items', 10);
@@ -101,4 +102,4 @@ class authors_page
 
 }
 
-new authors_page;
+authors_page::instance();

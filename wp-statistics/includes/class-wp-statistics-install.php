@@ -89,6 +89,8 @@ class Install
 						version varchar(255),
 						location varchar(10),
                         city varchar(100),
+                        region varchar(100),
+                        continent varchar(50),
 						`user_id` BIGINT(48) NOT NULL,
 						`page_id` BIGINT(48) NOT NULL,
 						`type` VARCHAR(100) NOT NULL,
@@ -96,7 +98,7 @@ class Install
 					) {$collate}");
         dbDelta($create_user_online_table);
 
-        // Visit Table
+        // Views Table
         $create_visit_table = ("
 					CREATE TABLE " . DB::table('visit') . " (
 						ID bigint(20) NOT NULL AUTO_INCREMENT,
@@ -126,6 +128,8 @@ class Install
 						hits int(11),
 						honeypot int(11),
 						city varchar(100),
+                        region varchar(100),
+                        continent varchar(50),
 						PRIMARY KEY  (ID),
 						UNIQUE KEY date_ip_agent (last_counter,ip,agent(50),platform(50),version(50)),
 						KEY agent (agent),
@@ -209,17 +213,10 @@ class Install
      */
     public static function create_visitor_relationship_table()
     {
-        // Get Table name
-        $table_name = DB::table('visitor_relationships');
-
-        // Get charset Collate
-        $collate = DB::charset_collate();
-
-        // if not Found then Create Table
-        if (DB::ExistTable($table_name) === false) {
-
-            $create_visitor_relationships_table =
-                "CREATE TABLE IF NOT EXISTS $table_name (
+        $table_name                         = DB::table('visitor_relationships');
+        $collate                            = DB::charset_collate();
+        $create_visitor_relationships_table =
+            "CREATE TABLE IF NOT EXISTS $table_name (
 				`ID` bigint(20) NOT NULL AUTO_INCREMENT,
 				`visitor_id` bigint(20) NOT NULL,
 				`page_id` bigint(20) NOT NULL,
@@ -229,15 +226,14 @@ class Install
 				KEY page_id (page_id)
 			) {$collate}";
 
-            dbDelta($create_visitor_relationships_table);
-        }
+        dbDelta($create_visitor_relationships_table);
+
     }
 
     public static function create_events_table()
     {
-        $table_name = DB::table('events');
-        $collate    = DB::charset_collate();
-
+        $table_name          = DB::table('events');
+        $collate             = DB::charset_collate();
         $create_events_table =
             "CREATE TABLE IF NOT EXISTS $table_name (
 				`ID` bigint(20) NOT NULL AUTO_INCREMENT,
@@ -355,7 +351,7 @@ class Install
     public function add_meta_links($links, $file)
     {
         if ($file == plugin_basename(WP_STATISTICS_MAIN_FILE)) {
-            $plugin_url = 'http://wordpress.org/plugins/wp-statistics/';
+            $plugin_url = 'https://wordpress.org/plugins/wp-statistics/';
 
             $links[]  = '<a href="' . $plugin_url . '" target="_blank" title="' . __('Click here to visit the plugin on WordPress.org', 'wp-statistics') . '">' . __('Visit WordPress.org page', 'wp-statistics') . '</a>';
             $rate_url = 'https://wordpress.org/support/plugin/wp-statistics/reviews/?rate=5#new-post';
@@ -381,11 +377,13 @@ class Install
             return;
         }
 
-        $userOnlineTable = DB::table('useronline');
-        $pagesTable      = DB::table('pages');
-        $visitorTable    = DB::table('visitor');
-        $historicalTable = DB::table('historical');
-        $searchTable     = DB::table('search');
+        $userOnlineTable      = DB::table('useronline');
+        $pagesTable           = DB::table('pages');
+        $visitorTable         = DB::table('visitor');
+        $historicalTable      = DB::table('historical');
+        $searchTable          = DB::table('search');
+        $eventTable           = DB::table('events');
+        $visitorRelationships = DB::table('visitor_relationships');
 
         /**
          * Add visitor city
@@ -398,6 +396,26 @@ class Install
         }
 
         /**
+         * Add visitor region
+         *
+         * @version 14.7.0
+         */
+        $result = $wpdb->query("SHOW COLUMNS FROM {$visitorTable} LIKE 'region'");
+        if ($result == 0) {
+            $wpdb->query("ALTER TABLE {$visitorTable} ADD `region` VARCHAR(100) NULL;");
+        }
+
+        /**
+         * Add visitor continent
+         *
+         * @version 14.7.0
+         */
+        $result = $wpdb->query("SHOW COLUMNS FROM {$visitorTable} LIKE 'continent'");
+        if ($result == 0) {
+            $wpdb->query("ALTER TABLE {$visitorTable} ADD `continent` VARCHAR(50) NULL;");
+        }
+
+        /**
          * Add online user city
          *
          * @version 14.5.2
@@ -405,6 +423,26 @@ class Install
         $result = $wpdb->query("SHOW COLUMNS FROM {$userOnlineTable} LIKE 'city'");
         if ($result == 0) {
             $wpdb->query("ALTER TABLE {$userOnlineTable} ADD `city` VARCHAR(100) NULL;");
+        }
+
+        /**
+         * Add online user region
+         *
+         * @version 14.7.0
+         */
+        $result = $wpdb->query("SHOW COLUMNS FROM {$userOnlineTable} LIKE 'region'");
+        if ($result == 0) {
+            $wpdb->query("ALTER TABLE {$userOnlineTable} ADD `region` VARCHAR(100) NULL;");
+        }
+
+        /**
+         * Add online user continent
+         *
+         * @version 14.7.0
+         */
+        $result = $wpdb->query("SHOW COLUMNS FROM {$userOnlineTable} LIKE 'continent'");
+        if ($result == 0) {
+            $wpdb->query("ALTER TABLE {$userOnlineTable} ADD `continent` VARCHAR(50) NULL;");
         }
 
         /**
@@ -457,18 +495,22 @@ class Install
         }
 
         /**
-         * Create Visitor and pages Relationship Table
+         * Create Visitor and pages relationship table if is not exist.
          *
          * @version 13.0.0
          */
-        self::create_visitor_relationship_table();
+        if (DB::ExistTable($visitorRelationships) === false) {
+            self::create_visitor_relationship_table();
+        }
 
         /**
-         * Create events table
+         * Create events table if is not exist.
          *
          * @version 14.4
          */
-        self::create_events_table();
+        if (DB::ExistTable($eventTable) === false) {
+            self::create_events_table();
+        }
 
         /**
          * Change Charset All Table To New WordPress Collate
@@ -586,6 +628,13 @@ class Install
          */
         if (Option::get('force_robot_update')) {
             Referred::download_referrer_spam();
+        }
+
+        /**
+         * Update options
+         */
+        if (WP_STATISTICS_VERSION == '14.7') {
+            Option::update('privacy_audit', true);
         }
 
         /**
