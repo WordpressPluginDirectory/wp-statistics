@@ -30,22 +30,22 @@ $taxName        = Helper::getTaxonomyName(Request::get('tx', 'category'), true);
                                         </th>
                                         <th class="wps-pd-l">
                                             <a href="<?php echo esc_url(Helper::getTableColumnSortUrl('posts')) ?>" class="sort <?php echo Request::compare('order_by', 'posts') ? esc_attr($order) : ''; ?>">
-                                                <?php esc_html_e('Published ', 'wp-statistics'); ?>
+                                                <?php esc_html_e('Published', 'wp-statistics'); ?>&nbsp;
                                             </a>
                                         </th>
                                         <th class="wps-pd-l">
                                             <a href="<?php echo esc_url(Helper::getTableColumnSortUrl('words')) ?>" class="sort <?php echo Request::compare('order_by', 'words') ? esc_attr($order) : ''; ?>">
-                                                <?php esc_html_e('Words ', 'wp-statistics'); ?>
+                                                <?php esc_html_e('Words', 'wp-statistics'); ?>&nbsp;
                                             </a>
                                         </th>
                                         <th class="wps-pd-l">
                                             <a href="<?php echo esc_url(Helper::getTableColumnSortUrl('avg_views')) ?>" class="sort <?php echo Request::compare('order_by', 'avg_views') ? esc_attr($order) : ''; ?>">
-                                                <?php esc_html_e('Views/Content ', 'wp-statistics'); ?>
+                                                <?php esc_html_e('Views/Content', 'wp-statistics'); ?>&nbsp;
                                             </a>
                                         </th>
                                         <th class="wps-pd-l">
                                             <a href="<?php echo esc_url(Helper::getTableColumnSortUrl('avg_words')) ?>" class="sort <?php echo Request::compare('order_by', 'avg_words') ? esc_attr($order) : ''; ?>">
-                                                <?php esc_html_e('Words/Content ', 'wp-statistics'); ?>
+                                                <?php esc_html_e('Words/Content', 'wp-statistics'); ?>&nbsp;
                                             </a>
                                         </th>
                                     </tr>
@@ -55,7 +55,7 @@ $taxName        = Helper::getTaxonomyName(Request::get('tx', 'category'), true);
                                         <tr>
                                             <td class="wps-pd-l">
                                                 <span class="wps-ellipsis-parent" title="<?php echo esc_attr($term->term_name) ?>">
-                                                    <a href="<?php echo esc_url(Menus::admin_url('category-analytics', ['type' => 'single', 'term_id' => $term->term_id, 'from' => Request::get('from', date('Y-m-d', strtotime('-29 days'))), 'to' => Request::get('to', date('Y-m-d'))])) ?>"><span class="wps-ellipsis-text"><?php echo esc_html($term->term_name) ?></span></a>
+                                                    <a href="<?php echo esc_url(Menus::admin_url('category-analytics', ['type' => 'single', 'term_id' => $term->term_id])) ?>"><span class="wps-ellipsis-text"><?php echo esc_html($term->term_name) ?></span></a>
                                                 </span>
                                             </td>
                                             <td class="wps-pd-l"><?php echo esc_html(number_format_i18n($term->views)) ?></td>
