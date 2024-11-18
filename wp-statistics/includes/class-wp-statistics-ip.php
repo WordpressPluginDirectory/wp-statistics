@@ -2,9 +2,10 @@
 
 namespace WP_STATISTICS;
 
+use ErrorException;
 use Exception;
 use WP_Statistics;
-use WP_Statistics\Dependencies\IPTools\Range;
+use WP_Statistics\Service\Analytics\DeviceDetection\UserAgent;
 
 class IP
 {
@@ -20,7 +21,7 @@ class IP
      *
      * @var array
      */
-    public static $private_SubNets = array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.1/24', 'fc00::/7');
+    public static $private_SubNets = array('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.1/24', 'fc00::/7', '::1');
 
     /**
      * List Of Common $_SERVER for get Users IP
@@ -114,12 +115,15 @@ class IP
 
     public static function getIpVersion()
     {
-        try {
-            $ipTools = new \WP_Statistics\Dependencies\IPTools\IP(self::getIP());
-            return $ipTools->getVersion();
-        } catch (Exception $e) {
-            return '';
+        $ip = self::getIP();
+
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return 'IPv4';
+        } elseif (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return 'IPv6';
         }
+
+        return '';
     }
 
     /**
@@ -164,8 +168,8 @@ class IP
             $ip = self::getIP();
         }
 
-        // Retrieve the current user agent, defaulting to 'Unknown' if unavailable or empty.
-        $userAgent = (UserAgent::getHttpUserAgent() == '' ? 'Unknown' : UserAgent::getHttpUserAgent());
+        // Retrieve the current user agent, defaulting to '' if unavailable or empty.
+        $userAgent = UserAgent::getHttpUserAgent();
 
         // Hash the combination of daily salt, IP, and user agent to create a unique identifier.
         // This hash is then prefixed and filtered for potential modification before being returned.
@@ -218,47 +222,88 @@ class IP
     }
 
     /**
-     * Check IP Has The Custom IP Range List
+     * Check if the given IP is within any of the specified IP ranges.
      *
      * @param $ip
      * @param array $range
      * @return bool
      * @throws Exception
      */
-    public static function CheckIPRange($range = array(), $ip = false)
+    public static function checkIPRange($ranges = array(), $ip = false)
     {
+        $isWithinRange = false;
 
         // Get User IP
-        $ip = ($ip === false ? IP::getIP() : $ip);
-
-        // Get Range OF This IP
-        try {
-            $ip = new WP_Statistics\Dependencies\IPTools\IP($ip);
-        } catch (Exception $e) {
-            WP_Statistics::log($e->getMessage(), 'warning');
-            $ip = new WP_Statistics\Dependencies\IPTools\IP(self::$default_ip);
+        if (!$ip) {
+            $ip = self::getIP();
         }
 
         // Check List
-        foreach ($range as $list) {
+        foreach ($ranges as $range) {
             try {
-                $parsedRange = Range::parse($list);
-                $contains_ip = false;
-
-                if ($parsedRange->contains($ip)) {
-                    $contains_ip = true;
+                // Not a CIDR range, just compare IPs directly
+                if (strpos($range, '/') === false) {
+                    if ($ip === $range) {
+                        $isWithinRange = true;
+                        break;
+                    } else {
+                        continue;
+                    }
                 }
+
+                // Separate the IP from the CIDR mask
+                [$range, $netmask] = explode('/', $range, 2);
+
+                // Skip if the IPv4 netmask is not valid
+                if (self::isIPv4($range) && ($netmask < 0 || $netmask > 32)) continue;
+
+                // Skip if the IPv6 netmask is not valid
+                if (self::isIPv6($range) && ($netmask < 0 || $netmask > 128)) continue;
+
+                // Skip IPv6 range if IP is IPv4, or vise versa
+                if ((self::isIPv4($ip) && self::isIPv6($range)) || (self::isIPv6($ip) && self::isIPv4($range))) continue;
+
+                // Convert IP and Range to binary values
+                $binIp      = inet_pton($ip);
+                $binRange   = inet_pton($range);
+
+                if ($binIp == false || $binRange == false) {
+                    throw new ErrorException(esc_html__('Invalid IP address or Range.'));
+                }
+
+                // Calculate the number of bytes in the IP address
+                $bytes = strlen($binIp);
+
+                // Calculate the number of bits in the netmask
+                $bits = absint($netmask);
+
+                // Calculate the number of bytes in the netmask
+                $netmaskBytes = ceil($bits / 8);
+
+                // Calculate the netmask
+                $netmask = str_repeat("\xff", $netmaskBytes);
+
+                // If the number of bits is not a multiple of 8, calculate the remaining bits
+                if ($bits % 8 != 0) {
+                    $remainingBits = 8 - ($bits % 8);
+                    $netmask = substr($netmask, 0, -1) . chr(256 - pow(2, $remainingBits));
+                }
+
+                // Pad the netmask with zeros if necessary
+                $netmask = str_pad($netmask, $bytes, "\x00");
+
+                if (($binIp & $netmask) === ($binRange & $netmask)) {
+                    $isWithinRange = true;
+                    break;
+                }
+
             } catch (Exception $e) {
                 WP_Statistics::log($e->getMessage(), 'warning');
-                $contains_ip = false;
-            }
-
-            if ($contains_ip) {
-                return true;
+                $isWithinRange = false;
             }
         }
 
-        return false;
+        return $isWithinRange;
     }
 
     /**
@@ -270,6 +315,28 @@ class IP
     public static function isIP($ip)
     {
         return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+    }
+
+    /**
+     * Validate an IP address is an IPv6 address
+     *
+     * @param string $ip The IP address to validate
+     * @return bool True if the IP address is an IPv6 address, false otherwise
+     */
+    public static function isIPv6($ip)
+    {
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
+    }
+
+    /**
+     * Validate an IP address is an IPv4 address
+     *
+     * @param string $ip The IP address to validate
+     * @return bool True if the IP address is an IPv4 address, false otherwise
+     */
+    public static function isIPv4($ip)
+    {
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
     }
 
     /**

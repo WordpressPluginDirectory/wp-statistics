@@ -129,6 +129,24 @@
                 });
         });
 
+
+        const forms = document.querySelectorAll('.wps-submit-agree');
+
+        if (forms.length > 0) {
+            forms.forEach(function(form) {
+                const submitButton = form.querySelector('button[type="button"]');
+                submitButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const agreeMessage = form.getAttribute('data-agree');
+                     const agree = confirm(agreeMessage);
+                    if (!agree) return;
+                    submitButton.classList.add('wps-loading-btn');
+                     form.submit();
+                });
+            });
+        }
+
+
         jQuery("#delete-ip-submit").click(function () {
 
             var value = jQuery('#delete-ip').val();
@@ -285,7 +303,7 @@
                     <input id="delete-user-ids-submit" class="button button-primary" type="submit" value="<?php esc_html_e('Delete User IDs Now', 'wp-statistics'); ?>" name="delete_user_ids_submit">
                     <p class="description">
                         <?php esc_html_e('Permanently deletes all stored User IDs from the database to anonymize user visit records or to comply with privacy regulations.', 'wp-statistics'); ?><br>
-                        <span class="wps-note"><?php esc_html_e('Caution:', 'wp-statistics'); ?></span>
+                        <span class="wps-note"><?php esc_html_e('Caution', 'wp-statistics'); ?>:</span>
                         <?php esc_html_e('Permanent and cannot be reversed.', 'wp-statistics'); ?>
                     </p>
                     <span id="delete-user-ids-status"></span>
@@ -301,7 +319,7 @@
                     <input id="clear-user-agent-strings-submit" class="button button-primary" type="submit" value="<?php esc_html_e('Clear User Agent Data Now', 'wp-statistics'); ?>" name="clear_user_agent_strings_submit">
                     <p class="description">
                         <?php esc_html_e('Permanently erases all User Agent Strings from the database, typically done after troubleshooting to remove unnecessary data.', 'wp-statistics'); ?><br>
-                        <span class="wps-note"><?php esc_html_e('Caution:', 'wp-statistics'); ?></span>
+                        <span class="wps-note"><?php esc_html_e('Caution', 'wp-statistics'); ?>:</span>
                         <?php esc_html_e('Permanent and cannot be undone.', 'wp-statistics'); ?>
                     </p>
                     <span id="clear-user-agent-strings-status"></span>
@@ -317,7 +335,7 @@
                     <input id="query-params-cleanup-submit" class="button button-primary" type="submit" value="<?php esc_html_e('Run Cleanup', 'wp-statistics'); ?>" name="query_params_cleanup_submit">
                     <p class="description">
                         <?php esc_html_e('Removes previously stored query parameters from your historical data, ensuring consistency with your current privacy settings.', 'wp-statistics'); ?><br>
-                        <span class="wps-note"><?php esc_html_e('Caution:', 'wp-statistics'); ?></span>
+                        <span class="wps-note"><?php esc_html_e('Caution', 'wp-statistics'); ?>:</span>
                         <?php esc_html_e('It is recommended to back up your database before proceeding, as this cleanup is irreversible.', 'wp-statistics'); ?>
                     </p>
                     <span id="query-params-cleanup-status"></span>

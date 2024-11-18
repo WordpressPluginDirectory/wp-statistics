@@ -33,6 +33,12 @@ wps_js.formatNumber = function (num, fixed = 0) {
     if (num === null) {
         return null;
     }
+    num = parseFloat(num.toString().trim().replace(/[, ]/g, ''));
+
+    if (isNaN(num)) {
+        return null;
+    }
+
     if (num === 0) {
         return '0';
     }
@@ -515,7 +521,7 @@ const getOrCreateTooltip = (chart) => {
     return tooltipEl;
 };
 
-const externalTooltipHandler = (context, dataset, colors, data) => {
+const externalTooltipHandler = (context, dataset, colors, data, unitTime, dateLabels, monthTooltip) => {
     const {chart, tooltip} = context;
     const tooltipEl = getOrCreateTooltip(chart);
     if (tooltip.opacity === 0) {
@@ -526,19 +532,29 @@ const externalTooltipHandler = (context, dataset, colors, data) => {
         const titleLines = tooltip.title || [];
         const dataIndex = tooltip.dataPoints[0].dataIndex;
         const datasets = chart.data.datasets;
-
         let innerHtml = `<div>`;
         titleLines.forEach(title => {
-            // Assume `data.data.labels` contains `date` and `day` properties
-            const {date, day} = (data.data) ? data.data.labels[dataIndex] : data.labels[dataIndex] ;
-            innerHtml += `<div class="chart-title">${date} (${day})</div>`;
+            const {date, day} = (data.data) ? data.data.labels[dataIndex] : data.labels[dataIndex];
+            if (unitTime === 'day') {
+                innerHtml += `<div class="chart-title">${date} (${day})</div>`;
+            } else if (unitTime === 'month') {
+                innerHtml += `<div class="chart-title">${monthTooltip[dataIndex]} </div>`;
+            } else {
+                innerHtml += `<div class="chart-title">${dateLabels[dataIndex]} </div>`;
+            }
         });
 
 
         // Iterate over each dataset to create the tooltip content
         datasets.forEach((dataset, index) => {
             const meta = chart.getDatasetMeta(index);
-            const metaPrevious = chart.getDatasetMeta(index + 1);
+            // const metaPrevious = chart.getDatasetMeta(index + 1);
+
+
+            const metaPrevious = chart.data.datasets.find((dataset, dsIndex) => {
+                return dataset.label === `${datasets[index].label} (Previous)` && chart.getDatasetMeta(dsIndex);
+            });
+
             const value = dataset.data[dataIndex];
             const isPrevious = dataset.label.includes('(Previous)');
             if (!meta.hidden && !isPrevious) {
@@ -551,9 +567,13 @@ const externalTooltipHandler = (context, dataset, colors, data) => {
                     <span class="current-data__value">${value.toLocaleString()}</span>
                 </div>`;
             }
-            if (data?.previousData && !metaPrevious.hidden) {
-                const previousValue = data.previousData[dataset.label.replace(' (Previous)', '')]?.[dataIndex];
-                if (previousValue !== undefined && previousValue !== '' && !isPrevious) {
+
+
+            if (data?.previousData && metaPrevious && !chart.getDatasetMeta(chart.data.datasets.indexOf(metaPrevious)).hidden) {
+
+                const previousDataset = data.previousData.datasets.find(prev => prev.label === dataset.label.replace(' (Previous)', ''));
+                if (previousDataset !== undefined && previousDataset !== '' && previousDataset.data && !isPrevious) {
+                    let previousValue = previousDataset.data[dataIndex];
                     const previousLabel = data.previousData.labels[dataIndex].date;
                     innerHtml += `
                     <div class="previous-data">
@@ -628,12 +648,119 @@ const drawVerticalLinePlugin = {
     }
 };
 
-wps_js.new_line_chart = function (data, tag_id, newOptions) {
+
+const phpToMomentFormat = (phpFormat) => {
+    const formatMap = {
+        'd': 'DD',
+        'j': 'D',
+        'S': 'Do',
+        'n': 'M',
+        'm': 'MM',
+        'F': 'MMM',
+        'M': 'MMM',
+        'y': 'YY',
+        'Y': 'YYYY'
+    };
+    return phpFormat.replace(/([a-zA-Z])/g, (match) => formatMap[match] || match);
+}
+
+wps_js.new_line_chart = function (data, tag_id, newOptions = null, type = 'line') {
+    const phpDateFormat = wps_js.isset(wps_js.global, 'options', 'wp_date_format') ? wps_js.global['options']['wp_date_format'] : 'MM/DD/YYYY';
+    let momentDateFormat = phpToMomentFormat(phpDateFormat);
+    // Check if chart is inside the dashboard-widgets div
+    const isInsideDashboardWidgets = document.getElementById(tag_id).closest('#dashboard-widgets') !== null;
+    const formatDateRange = (start, end, unitTime) => {
+        const startDateFormat = momentDateFormat.replace(/,?\s?(YYYY|YY)[-/\s]?,?|[-/\s]?(YYYY|YY)[-/\s]?,?/g, "");
+        if (unitTime === 'month') {
+            return moment(start).format('MMM YYYY');
+        } else {
+            if (isInsideDashboardWidgets) {
+                return `${moment(start).format(startDateFormat)} to ${moment(end).format(startDateFormat)}`;
+            } else {
+                return `${moment(start).format(startDateFormat)} to ${moment(end).format(momentDateFormat)}`;
+            }
+
+        }
+    }
+    const setMonthDateRange = (start, end) => {
+        const startDateFormat = momentDateFormat.replace(/,?\s?(YYYY|YY)[-/\s]?,?|[-/\s]?(YYYY|YY)[-/\s]?,?/g, "");
+        return `${moment(start).format(startDateFormat)} to ${moment(end).format(momentDateFormat)}`;
+    }
+
+    const aggregateData = (labels, datasets, unitTime) => {
+        const aggregatedLabels = [];
+        let monthTooltipTitle = [];
+        const aggregatedData = datasets.map(() => []);
+        let tempData = [];
+        let tempLabelStart = labels[0]?.date;
+
+        labels.forEach((label, i) => {
+            const currentMoment = moment(label.date);
+            if (!currentMoment.isValid()) {
+                console.error(`Invalid date found at index ${i}:`, label.date);
+                return; // Skip invalid date
+            }
+
+            const isEndOfPeriod = (unitTime === 'week' && currentMoment.day() === 0) ||
+                (unitTime === 'month' && currentMoment.date() === currentMoment.daysInMonth());
+
+            // Collect data for each week/month
+            tempData.push({...label, index: i}); // Track index for dataset reference
+
+            if (isEndOfPeriod || i === labels.length - 1) {
+                const tempLabelEnd = labels[i]?.date || tempLabelStart;
+                aggregatedLabels.push(formatDateRange(tempLabelStart, tempLabelEnd, unitTime)); // Pass unitTime
+                if (unitTime === 'month') {
+                    monthTooltipTitle.push(setMonthDateRange(tempLabelStart, tempLabelEnd));
+                }
+
+                datasets.forEach((dataset, idx) => {
+                    const aggregatedValue = tempData.reduce((sum, dataObj) => {
+                        const value = dataset.data[dataObj.index];
+                        return !isNaN(value) && value != null ? sum + value : sum; // Ensure valid number addition
+                    }, 0);
+                    aggregatedData[idx].push(aggregatedValue);
+                });
+
+                tempData = [];
+                tempLabelStart = labels[i + 1]?.date || ''; // Prepare for next aggregation
+            }
+        });
+
+        return {aggregatedLabels, aggregatedData, monthTooltipTitle};
+    }
+
+// Determine whether to aggregate by day, week, or month
+    let dateLabels = data.data.labels.map(dateObj => dateObj.formatted_date);
+    let monthTooltip = [];
+    const length = dateLabels.length;
+    const containsPostsLabel = type === 'performance' && data.data.datasets.length > 2;
+    const threshold = type === 'performance' ? 30 : 60;
+    let unitTime = length <= threshold ? 'day' : length <= 180 ? 'week' : 'month';
+
+// Aggregate data for week or month view
+    if (unitTime === 'week' || unitTime === 'month') {
+        const aggregatedData = aggregateData(data.data.labels, data.data.datasets, unitTime);
+
+        dateLabels = aggregatedData.aggregatedLabels;
+        data.data.datasets.forEach((dataset, idx) => {
+            dataset.data = aggregatedData.aggregatedData[idx];
+        });
+        if (data.previousData && data.previousData.datasets.length > 0) {
+            const aggregatedPreviousData = aggregateData(data.data.labels, data.previousData.datasets, unitTime);
+            data.previousData.datasets.forEach((dataset, idx) => {
+                dataset.data = aggregatedPreviousData.aggregatedData[idx];
+            });
+        }
+        monthTooltip = aggregatedData.monthTooltipTitle;
+    }
+
     // Define the colors
     let colors = {
         'Total': '#27A765',
-        'views': '#7362BF',
-        'visitors': '#3288D7',
+        'Views': '#7362BF',
+        'Visitors': '#3288D7',
+        'Posts': '#8AC3D0',
         'Other1': '#3288D7',
         'Other2': '#7362BF',
         'Other3': '#8AC3D0'
@@ -643,22 +770,32 @@ wps_js.new_line_chart = function (data, tag_id, newOptions) {
     // Get Element By ID
     let ctx_line = document.getElementById(tag_id).getContext('2d');
 
-    // Check if chart is inside the dashboard-widgets div
-    const isInsideDashboardWidgets = document.getElementById(tag_id).closest('#dashboard-widgets') !== null;
-
     const datasets = [];
+
+
     // Dynamically create datasets
-    Object.keys(data.data).forEach((key, index) => {
+    Object.keys(data.data.datasets).forEach((key, index) => {
 
-        if (key !== 'labels') {
-            let color = colors[key] || colors[`Other${index}`];
-            let tension = tensionValues[index % tensionValues.length]; // Use tension value based on index
+        let color = colors[data.data.datasets[key].label] || colors[`Other${index + 1}`];
 
+        let tension = tensionValues[index % tensionValues.length]; // Use tension value based on index
+
+        if (containsPostsLabel && index === 2) {
+            datasets.push({
+                type: 'bar',
+                label: data.data.datasets[key].label,
+                data: data.data.datasets[key].data,
+                backgroundColor: color,
+                hoverBackgroundColor: color,
+                hoverPointBackgroundColor: color,
+                yAxisID: 'y1',
+            });
+        } else {
             // Main dataset
             datasets.push({
                 type: 'line',
-                label: key,
-                data: data.data[key],
+                label: data.data.datasets[key].label,
+                data: data.data.datasets[key].data,
                 borderColor: color,
                 backgroundColor: color,
                 fill: false,
@@ -672,35 +809,43 @@ wps_js.new_line_chart = function (data, tag_id, newOptions) {
                 hoverPointBorderColor: '#fff',
                 hoverPointBackgroundColor: color,
                 hoverPointBorderWidth: 4,
-                tension: tension
+                tension: tension,
+                hitRadius: 10
             });
-
-            // Previous data dataset
-            if (data.previousData[key]) {
-                datasets.push({
-                    type: 'line',
-                    label: `${key} (Previous)`,
-                    data: data.previousData[key],
-                    borderColor: wps_js.hex_to_rgba(color, 0.7),
-                    hoverBorderColor: color,
-                    backgroundColor: color,
-                    fill: false,
-                    yAxisID: 'y',
-                    borderWidth: 1,
-                    borderDash: [5, 5],
-                    pointRadius: 0,
-                    pointBorderColor: 'transparent',
-                    pointBackgroundColor: color,
-                    pointBorderWidth: 2,
-                    hoverPointRadius: 6,
-                    hoverPointBorderColor: '#fff',
-                    hoverPointBackgroundColor: color,
-                    hoverPointBorderWidth: 4,
-                    tension: tension
-                });
-            }
         }
     });
+    if (data?.previousData) {
+        Object.keys(data.previousData.datasets).forEach((key, index) => {
+            let color = colors[data.previousData.datasets[key].label] || colors[`Other${index}`];
+            let tension = tensionValues[index % tensionValues.length]; // Use tension value based on index
+
+            // Previous data dataset
+            datasets.push({
+                type: 'line',
+                label: `${data.previousData.datasets[key].label} (Previous)`,
+                data: data.previousData.datasets[key].data,
+                borderColor: wps_js.hex_to_rgba(color, 0.7),
+                hoverBorderColor: color,
+                backgroundColor: color,
+                fill: false,
+                yAxisID: 'y',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                pointRadius: 0,
+                pointBorderColor: 'transparent',
+                pointBackgroundColor: color,
+                pointBorderWidth: 2,
+                hoverPointRadius: 6,
+                hoverPointBorderColor: '#fff',
+                hoverPointBackgroundColor: color,
+                hoverPointBorderWidth: 4,
+                tension: tension,
+                hitRadius: 10
+            });
+        });
+    }
+
+
     // Default options
     const defaultOptions = {
         maintainAspectRatio: false,
@@ -717,7 +862,7 @@ wps_js.new_line_chart = function (data, tag_id, newOptions) {
             legend: false,
             tooltip: {
                 enabled: false,
-                external: (context) => externalTooltipHandler(context, datasets, colors, data),
+                external: (context) => externalTooltipHandler(context, datasets, colors, data, unitTime, dateLabels, monthTooltip),
                 callbacks: {
                     title: (tooltipItems) => tooltipItems[0].label,
                     label: (tooltipItem) => tooltipItem.formattedValue
@@ -726,8 +871,7 @@ wps_js.new_line_chart = function (data, tag_id, newOptions) {
         },
         scales: {
             x: {
-                offset: data.data.labels.map(dateObj => dateObj.date).length <= 1,
-                min: 0,
+                offset: dateLabels.length <= 1,
                 grid: {
                     display: false,
                     drawBorder: false,
@@ -740,14 +884,15 @@ wps_js.new_line_chart = function (data, tag_id, newOptions) {
                 },
                 ticks: {
                     align: 'inner',
-                    maxTicksLimit: isInsideDashboardWidgets ?  5 :  9,
-                    fontColor: '#898A8E',
-                    fontStyle: 'italic',
-                    fontWeight: 'lighter ',
-                    fontSize: 13,
+                    autoSkip: true,
+                    maxTicksLimit: isInsideDashboardWidgets ? unitTime === 'week' ? 2 : 4 : unitTime === 'week' ? 3 : unitTime === 'month' ? 7 : 9,
+                    font: {
+                        color: '#898A8E',
+                        style: 'italic',
+                        weight: 'lighter',
+                        size: isInsideDashboardWidgets ? (unitTime === 'week' ? 9 : 11) : (unitTime === 'week' ? 11 : 13)
+                    },
                     padding: 8,
-                    lineHeight: 15,
-                    stepSize: 1
                 }
             },
             y: {
@@ -784,16 +929,79 @@ wps_js.new_line_chart = function (data, tag_id, newOptions) {
             }
         },
     };
+    if (containsPostsLabel) {
+        defaultOptions.scales.y1 = {
+            type: 'linear',
+            position: 'left',
+            border: {
+                color: 'transparent',
+                width: 0
+            },
+            grid: {
+                display: false,
+                drawBorder: false,
+                tickLength: 0,
+            },
+            ticks: {
+                maxTicksLimit: 7,
+                fontColor: '#898A8E',
+                fontSize: 13,
+                fontStyle: 'italic',
+                fontFamily: '"Roboto",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif',
+                fontWeight: 'lighter ',
+                padding: 8,
+                lineHeight: 15,
+                stepSize: 1
+            },
+            title: {
+                display: true,
+                text: `${wps_js._('published')} Posts`,
+                color: '#898A8E',
+                fontSize: 13
+            }
+        }
+
+        defaultOptions.scales.y = {
+            border: {
+                color: 'transparent',
+                width: 0
+            },
+            ticks: {
+                maxTicksLimit: 9,
+                fontColor: '#898A8E',
+                fontSize: 13,
+                fontStyle: 'italic',
+                fontFamily: '"Roboto",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif',
+                fontWeight: 'lighter ',
+                padding: 8,
+                lineHeight: 15,
+                stepSize: 1
+            },
+            position: containsPostsLabel ? 'right' : 'left',
+            grid: {
+                display: true,
+                borderDash: [5, 5],
+                tickColor: '#EEEFF1',
+                color: '#EEEFF1'
+            },
+            title: {
+                display: true,
+                text: wps_js._('visits'),
+                color: '#898A8E',
+                fontSize: 13,
+            }
+        }
+    }
     // Merge default options with user options
     const options = Object.assign({}, defaultOptions, newOptions);
     const lineChart = new Chart(ctx_line, {
-        type: 'line',
+        type: containsPostsLabel ? 'bar' : 'line',
         data: {
-            labels: data.data.labels.map(dateObj => dateObj.date),
+            labels: dateLabels,
             datasets: datasets,
         },
         plugins: [drawVerticalLinePlugin],
-        options: options,
+        options: options
     });
 
     const updateLegend = function () {
@@ -811,11 +1019,40 @@ wps_js.new_line_chart = function (data, tag_id, newOptions) {
                 if (b.label === 'Total (Previous)') return 1;
                 return 0;
             });
+            const previousPeriod = document.querySelectorAll('.wps-postbox-chart--previousPeriod');
+            if (previousPeriod.length > 0) {
+                let foundPrevious = false;
+
+                datasets.forEach((dataset) => {
+                    if (dataset.label.includes('(Previous)')) {
+                        foundPrevious = true;
+                    }
+                });
+
+                if (foundPrevious) {
+                    previousPeriod.forEach((element) => {
+                        element.style.display = 'flex';
+                    });
+                }
+            }
             datasets.forEach((dataset, index) => {
                 const isPrevious = dataset.label.includes('(Previous)');
                 if (!isPrevious) {
                     const currentData = dataset.data.reduce((a, b) => Number(a) + Number(b), 0);
-                    const previousData = data.previousData[dataset.label] ? data.previousData[dataset.label].reduce((a, b) => Number(a) + Number(b), 0) : null;
+                    let previousData = null;
+                    let previousDatasetIndex = null;
+                    if (data?.previousData?.datasets.length > 0) {
+                        const previousDataset = data.previousData.datasets.find((prev, prevIndex) => {
+                            if (prev.label === dataset.label) {
+                                previousDatasetIndex = prevIndex;
+                                return true;
+                            }
+                            return false;
+                        });
+                        if (previousDataset && previousDataset.data) {
+                            previousData = previousDataset.data.reduce((a, b) => Number(a) + Number(b), 0);
+                        }
+                    }
                     const legendItem = document.createElement('div');
                     legendItem.className = 'wps-postbox-chart--item';
 
@@ -852,15 +1089,20 @@ wps_js.new_line_chart = function (data, tag_id, newOptions) {
 
                     // Add click event to toggle visibility of the previous dataset
                     const previousDataDiv = legendItem.querySelector('.previous-data');
-                    if (previousDataDiv) {
+                    if (previousDataDiv && previousDatasetIndex !== null) {
                         previousDataDiv.addEventListener('click', function () {
-                            const metaPrevious = lineChart.getDatasetMeta(index + 1);
-                            if (metaPrevious && metaPrevious.label.includes('(Previous)')) {
+                            // Find the metaPrevious dataset by matching the label with "(Previous)"
+                            const metaPrevious = lineChart.data.datasets.find((dataset, dsIndex) => {
+                                return dataset.label === `${datasets[index].label} (Previous)` && lineChart.getDatasetMeta(dsIndex);
+                            });
+                            // Toggle visibility of the previous dataset
+                            if (metaPrevious) {
+                                const metaPreviousIndex = lineChart.data.datasets.indexOf(metaPrevious);
+                                const metaPreviousVisibility = lineChart.getDatasetMeta(metaPreviousIndex);
+                                metaPreviousVisibility.hidden = !metaPreviousVisibility.hidden;
                                 previousDataDiv.classList.toggle('wps-line-through');
-                                metaPrevious.hidden = !metaPrevious.hidden;
+                                lineChart.update();
                             }
-
-                            lineChart.update();
                         });
                     }
                     legendContainer.appendChild(legendItem);
@@ -869,191 +1111,6 @@ wps_js.new_line_chart = function (data, tag_id, newOptions) {
         }
     };
     updateLegend();
-};
-
-wps_js.performance_chart = function (data, tag_id, type) {
-
-    const colors = ['#3288D7', '#7362BF', '#8AC3D0'];
-    const is_single_content = type === 'content-single';
-    const legendHandel = (chart) => {
-
-        document.querySelectorAll('.js-wps-performance-chart__item').forEach((legendItem, index) => {
-            legendItem.addEventListener('click', () => {
-
-                const metaMain = chart.getDatasetMeta(index);
-                metaMain.hidden = !metaMain.hidden;
-                chart.update();
-                legendItem.classList.toggle('hidden', metaMain.hidden);
-            });
-        });
-    }
-    let ctx_performance = document.getElementById(tag_id).getContext('2d');
-    let datasets = [
-        {
-            type: 'line',
-            label: wps_js._('visitors'),
-            data: data.visitors,
-            borderColor: wps_js.hex_to_rgba(colors[0], 0.8),
-            yAxisID: 'y',
-            borderWidth: 2,
-            pointRadius: 0,
-            pointBorderColor: 'transparent',
-            pointBackgroundColor: colors[0],
-            pointBorderWidth: 2,
-            hoverPointRadius: 6,
-            hoverPointBorderColor: '#fff',
-            hoverPointBackgroundColor: colors[0],
-            hoverPointBorderWidth: 4,
-            tension: 0.4
-        },
-        {
-            type: 'line',
-            label: wps_js._('visits'),
-            data: data.views,
-            borderColor: wps_js.hex_to_rgba(colors[1], 0.8),
-            pointStyle: 'circle',
-            yAxisID: 'y',
-            borderWidth: 2,
-            pointRadius: 0,
-            pointBorderColor: 'transparent',
-            pointBackgroundColor: colors[1],
-            pointBorderWidth: 2,
-            hoverPointRadius: 6,
-            hoverPointBorderColor: '#fff',
-            hoverPointBackgroundColor: colors[1],
-            hoverPointBorderWidth: 4,
-            tension: 0.7
-        }
-    ]
-    if (!is_single_content) datasets.push({
-        type: 'bar',
-        label: type === 'content' ? `${wps_js._('published')} Posts` : `${wps_js._('published')} Contents`,
-        data: data.posts,
-        backgroundColor: wps_js.hex_to_rgba(colors[2], 0.5),
-        hoverBackgroundColor: colors[2],
-        hoverPointBackgroundColor: colors[2],
-        yAxisID: 'y1',
-    })
-
-
-    let scales = {
-        x: {
-            offset: !is_single_content,
-            ticks: {
-                maxTicksLimit: 9,
-                fontColor: '#898A8E',
-                fontSize: 13,
-                fontStyle: 'italic',
-                fontWeight: 'lighter ',
-                padding: 8,
-                lineHeight: 15,
-                stepSize: 1
-            },
-            border: {
-                color: 'transparent',
-                width: 0
-            },
-            grid: {
-                display: false,
-                drawBorder: false,
-                tickLength: 0
-            }
-        },
-        y: {
-            border: {
-                color: 'transparent',
-                width: 0
-            },
-            ticks: {
-                maxTicksLimit: 9,
-                fontColor: '#898A8E',
-                fontSize: 13,
-                fontStyle: 'italic',
-                fontWeight: 'lighter ',
-                padding: 8,
-                lineHeight: 15,
-                stepSize: 1
-            },
-            type: 'linear',
-            position: is_single_content ? 'left' : 'right',
-            grid: {
-                display: true,
-                borderDash: [5, 5],
-                tickColor: '#EEEFF1',
-                color: '#EEEFF1'
-            },
-            title: {
-                display: true,
-                text: wps_js._('visits'),
-                color: '#898A8E',
-                fontSize: 13,
-            }
-        }
-    }
-    if (!is_single_content) {
-        scales.y1 = {
-            type: 'linear',
-            position: 'left',
-            border: {
-                color: 'transparent',
-                width: 0
-            },
-            grid: {
-                display: false,
-                drawBorder: false,
-                tickLength: 0,
-            },
-            ticks: {
-                maxTicksLimit: 7,
-                fontColor: '#898A8E',
-                fontSize: 13,
-                fontStyle: 'italic',
-                fontWeight: 'lighter ',
-                padding: 8,
-                lineHeight: 15,
-                stepSize: 1
-            },
-            title: {
-                display: true,
-                text: type === 'content' ? `${wps_js._('published')} Posts` : `${wps_js._('published')} Contents`,
-                color: '#898A8E',
-                fontSize: 13
-            }
-        }
-    }
-
-    const performanceChart = new Chart(ctx_performance, {
-        type: 'bar',
-        data: {
-            labels: data.labels.map(dateObj => dateObj.date),
-            datasets: datasets
-        },
-        options: {
-            maintainAspectRatio: false,
-            resizeDelay: 200,
-            responsive: true,
-            animation: {
-                duration: 0,  // Disable animation
-            },
-            interaction: {
-                intersect: false,
-            },
-            plugins: {
-                legend: false,
-                tooltip: {
-                    enabled: false,
-                    external: (context) => externalTooltipHandler(context, datasets, colors, data),
-                    callbacks: {
-                        title: (tooltipItems) => tooltipItems[0].label,
-                        label: (tooltipItem) => tooltipItem.formattedValue
-                    }
-                },
-            },
-            scales: scales
-        },
-        plugins: [drawVerticalLinePlugin]
-    });
-    legendHandel(performanceChart)
 };
 
 
@@ -1127,39 +1184,4 @@ jQuery(document).ready(function () {
             content.addClass('show');
         }
     });
-});
-
-/**
- * FeedbackBird position
- * */
-function moveFeedbackBird() {
-    let windowWidth = window.outerWidth || document.documentElement.clientWidth;
-    const feedbackBird = document.getElementById('feedback-bird-app');
-    const feedbackBirdTitle = document.querySelector('.c-fbb-widget__header__title');
-    const license = document.querySelector('.wps-mobileMenuContent .wps-bundle');
-    const support = document.querySelector('.wps-adminHeader__side');
-    if (feedbackBird && (document.body.classList.contains('wps_page'))) {
-        if (windowWidth <= 1030) {
-            const cutDiv = feedbackBird.parentNode.removeChild(feedbackBird);
-            license.parentNode.insertBefore(cutDiv, license);
-        } else {
-            const cutDiv = feedbackBird.parentNode.removeChild(feedbackBird);
-            support.appendChild(cutDiv);
-        }
-        feedbackBird.style.display = 'block';
-        feedbackBird.setAttribute('title', feedbackBirdTitle.innerHTML);
-    }
-}
-
-window.onload = moveFeedbackBird;
-window.addEventListener('resize', moveFeedbackBird);
-
-jQuery(document).ready(function () {
-    const targetElement = document.querySelector('.wp-header-end');
-    const noticeElement = document.querySelector('.notice.notice-warning.update-nag');
-    // Check if both targetElement and noticeElement exist
-    if (targetElement && noticeElement) {
-        // Move the notice element after the target element
-        targetElement.parentNode.insertBefore(noticeElement, targetElement.nextSibling);
-    }
 });

@@ -5,6 +5,7 @@ namespace WP_STATISTICS;
 use WP_Statistics\Async\BackgroundProcessFactory;
 use WP_Statistics\Components\Singleton;
 use WP_Statistics\Service\Admin\NoticeHandler\Notice;
+use WP_Statistics\Service\Geolocation\GeolocationFactory;
 
 class optimization_page extends Singleton
 {
@@ -37,18 +38,18 @@ class optimization_page extends Singleton
 
         // Check Access Level
         if (Menus::in_page('optimization') and !User::Access('manage')) {
-            wp_die(__('You do not have sufficient permissions to access this page.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped	
+            wp_die(__('You do not have sufficient permissions to access this page.')); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         }
 
         // Check Wp Nonce and Require Field
-        if (isset($_POST['submit']) && (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'wps_optimization_nonce'))) {
+        if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'wps_optimization_nonce')) {
             return;
         }
 
         // Update All GEO IP Country
-        if (isset($_POST['submit'], $_POST['populate-submit']) && intval($_POST['populate-submit']) == 1) {
+        if (isset($_POST['update_location_action']) && intval($_POST['update_location_action']) == 1) {
             // First download/update the GeoIP database
-            GeoIP::download('update');
+            GeolocationFactory::downloadDatabase();
 
             // Update GeoIP data for visitors with incomplete information
             BackgroundProcessFactory::batchUpdateIncompleteGeoIpForVisitors();
@@ -57,8 +58,18 @@ class optimization_page extends Singleton
             Notice::addFlashNotice(__('GeoIP update for incomplete visitors initiated successfully.', 'wp-statistics'), 'success');
         }
 
+        // Update source channel data
+        if (isset($_POST['update_source_channels_action']) && intval($_POST['update_source_channels_action']) == 1) {
+
+            // Update source channel data for visitors with incomplete information
+            BackgroundProcessFactory::batchUpdateSourceChannelForVisitors();
+
+            // Show Notice
+            Notice::addFlashNotice(__('Source channel update for visitors initiated successfully.', 'wp-statistics'), 'success');
+        }
+
         // Check Hash IP Update
-        if (isset($_POST['submit'], $_POST['hash-ips-submit']) and intval($_POST['hash-ips-submit']) == 1) {
+        if (isset($_POST['update_ips_action']) && intval($_POST['update_ips_action']) == 1) {
             $result = IP::Update_HashIP_Visitor();
 
             // Show Notice
