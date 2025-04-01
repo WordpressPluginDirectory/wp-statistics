@@ -7,6 +7,7 @@ use WP_Statistics\Components\DateRange;
 use WP_Statistics\Decorators\ReferralDecorator;
 use WP_Statistics\Decorators\VisitorDecorator;
 use WP_STATISTICS\Helper;
+use WP_Statistics\Service\Database\DatabaseFactory;
 use WP_Statistics\Service\Geolocation\GeolocationFactory;
 use WP_Statistics\Utils\Query;
 
@@ -31,15 +32,17 @@ class VisitorsModel extends BaseModel
             'user_id'       => '',
             'ip'            => '',
             'logged_in'     => false,
-            'user_role'     => ''
+            'user_role'     => '',
+            'referrer'      => ''
         ]);
 
-        $query = Query::select('COUNT(visitor.id) as total_visitors')
+        $query = Query::select('COUNT(*) as total_visitors')
             ->from('visitor')
             ->where('agent', '=', $args['agent'])
             ->where('location', '=', $args['country'])
             ->where('platform', '=', $args['platform'])
             ->where('user_id', '=', $args['user_id'])
+            ->where('referred', '=', $args['referrer'])
             ->where('ip', '=', $args['ip'])
             ->whereDate('last_counter', $args['date']);
 
@@ -161,7 +164,7 @@ class VisitorsModel extends BaseModel
 
         $query = Query::select(array_merge([
             'visitor.last_counter as date',
-            'COUNT(visitor.ID) as visitors'
+            'COUNT(*) as visitors'
         ], $additionalFields))
             ->from('visitor')
             ->where('location', '=', $args['country'])
@@ -228,7 +231,7 @@ class VisitorsModel extends BaseModel
             'referrer'          => ''
         ]);
 
-        $result = Query::select('COUNT(visitor.ID) as visitors, last_counter as date')
+        $result = Query::select('COUNT(*) as visitors, last_counter as date')
             ->from('visitor')
             ->where('source_channel', '=', $args['source_channel'])
             ->where('source_name', '=', $args['source_name'])
@@ -458,6 +461,10 @@ class VisitorsModel extends BaseModel
 
     public function getVisitorsData($args = [])
     {
+        if (! DatabaseFactory::compareCurrentVersion('14.12.6', '>=')) {
+            return LegacyModel::get('visitorsData', $args, '14.12.4');
+        }
+
         $args = $this->parseArgs($args, [
             'date'          => '',
             'resource_type' => '',
@@ -477,12 +484,14 @@ class VisitorsModel extends BaseModel
             'order'         => 'DESC',
             'page'          => '',
             'per_page'      => '',
-            'page_info'     => false,
             'user_info'     => false,
             'date_field'    => 'visitor.last_counter',
             'logged_in'     => false,
             'user_role'     => '',
-            'fields'        => []
+            'event_target'  => '',
+            'event_name'    => '',
+            'fields'        => [],
+            'referrer'      => ''
         ]);
 
         // Set default fields
@@ -504,32 +513,11 @@ class VisitorsModel extends BaseModel
                 'visitor.last_counter',
                 'visitor.source_channel',
                 'visitor.source_name',
+                'visitor.first_page',
+                'visitor.first_view',
+                'visitor.last_page',
+                'visitor.last_view',
             ];
-        }
-
-        // If page info is true, get last page the visitor has visited
-        if ($args['page_info'] === true) {
-
-            $lastHit = Query::select([
-                'visitor_id',
-                'MAX(date) as date'
-            ])
-                ->from('visitor_relationships')
-                ->groupBy('visitor_id')
-                ->getQuery();
-
-            $subQuery = Query::select([
-                'visitor_relationships.visitor_id',
-                'page_id',
-                'date'
-            ])
-                ->from('visitor_relationships')
-                ->whereRaw("(visitor_id, date) IN ($lastHit)")
-                ->groupBy('visitor_id')
-                ->getQuery();
-
-            $args['fields'][] = 'last_hit.page_id as last_page';
-            $args['fields'][] = 'last_hit.date as last_view';
         }
 
         if ($args['user_info'] === true) {
@@ -548,6 +536,7 @@ class VisitorsModel extends BaseModel
             ->where('platform', '=', $args['platform'])
             ->where('user_id', '=', $args['user_id'])
             ->where('ip', 'LIKE', "%{$args['ip']}%")
+            ->where('referred', '=', $args['referrer'])
             ->where('visitor.location', '=', $args['country'])
             ->whereDate($args['date_field'], $args['date'])
             ->perPage($args['page'], $args['per_page'])
@@ -566,11 +555,6 @@ class VisitorsModel extends BaseModel
             }
         }
 
-        // If last page is true, get last page the visitor has visited
-        if ($args['page_info'] === true) {
-            $query->joinQuery($subQuery, ['visitor.ID', 'last_hit.visitor_id'], 'last_hit', 'LEFT');
-        }
-
         if ($args['user_info']) {
             $query->join('users', ['visitor.user_id', 'users.ID'], [], 'LEFT');
         }
@@ -586,7 +570,7 @@ class VisitorsModel extends BaseModel
                 ->where('pages.uri', '=', $args['query_param']);
         }
 
-        if (array_intersect(['post_type', 'post_id', 'query_param', 'taxonomy', 'term'], array_keys($filteredArgs))) {
+        if (array_intersect(['post_type', 'post_id', 'author_id', 'query_param', 'taxonomy', 'term'], array_keys($filteredArgs))) {
             $query
                 ->join('visitor_relationships', ['visitor_relationships.visitor_id', 'visitor.ID'])
                 ->join('pages', ['visitor_relationships.page_id', 'pages.page_id'], [], 'LEFT')
@@ -609,6 +593,13 @@ class VisitorsModel extends BaseModel
             }
         }
 
+        if (!empty($args['event_target']) || !empty($args['event_name'])) {
+            $query
+                ->join('events', ['events.visitor_id', 'visitor.ID'])
+                ->where('event_name', 'IN', $args['event_name'])
+                ->whereJson('event_data', 'target_url', '=', $args['event_target']);
+        }
+
         $result = $query->getAll();
 
         return $result ? $result : [];
@@ -616,6 +607,10 @@ class VisitorsModel extends BaseModel
 
     public function getReferredVisitors($args = [])
     {
+        if (! DatabaseFactory::compareCurrentVersion('14.12.6', '>=')) {
+            return LegacyModel::get('referredVisitors', $args, '14.12.4');
+        }
+
         $args = $this->parseArgs($args, [
             'date'              => '',
             'source_channel'    => '',
@@ -626,42 +621,6 @@ class VisitorsModel extends BaseModel
             'page'              => '',
             'per_page'          => '',
         ]);
-
-        $firstHit = Query::select([
-            'MIN(ID) as ID',
-            'visitor_id'
-        ])
-            ->from('visitor_relationships')
-            ->groupBy('visitor_id')
-            ->getQuery();
-
-        $firstHitQuery = Query::select([
-            'visitor_relationships.visitor_id',
-            'page_id',
-            'date'
-        ])
-            ->from('visitor_relationships')
-            ->whereRaw("(ID, visitor_id) IN ($firstHit)")
-            ->groupBy('visitor_id')
-            ->getQuery();
-
-        $lastHit = Query::select([
-            'visitor_id',
-            'MAX(date) as date'
-        ])
-            ->from('visitor_relationships')
-            ->groupBy('visitor_id')
-            ->getQuery();
-
-        $lastHitQuery = Query::select([
-            'visitor_relationships.visitor_id',
-            'page_id',
-            'date'
-        ])
-            ->from('visitor_relationships')
-            ->whereRaw("(visitor_id, date) IN ($lastHit)")
-            ->groupBy('visitor_id')
-            ->getQuery();
 
         $query = Query::select([
             'visitor.ID',
@@ -682,15 +641,13 @@ class VisitorsModel extends BaseModel
             'visitor.source_name',
             'users.display_name',
             'users.user_email',
-            'first_hit.page_id as first_page',
-            'first_hit.date as first_view',
-            'last_hit.page_id as last_page',
-            'last_hit.date as last_view'
+            'visitor.first_page',
+            'visitor.first_view',
+            'visitor.last_page',
+            'visitor.last_view'
         ])
             ->from('visitor')
             ->join('users', ['visitor.user_id', 'users.ID'], [], 'LEFT')
-            ->joinQuery($firstHitQuery, ['visitor.ID', 'first_hit.visitor_id'], 'first_hit', 'LEFT')
-            ->joinQuery($lastHitQuery, ['visitor.ID', 'last_hit.visitor_id'], 'last_hit', 'LEFT')
             ->where('source_name', '=', $args['source_name'])
             ->where('referred', '=', $args['referrer'])
             ->whereNotNull('visitor.referred')
@@ -722,7 +679,7 @@ class VisitorsModel extends BaseModel
             'referrer'          => ''
         ]);
 
-        $query = Query::select('COUNT(visitor.ID)')
+        $query = Query::select('COUNT(*)')
             ->from('visitor')
             ->where('source_name', '=', $args['source_name'])
             ->where('referred', '=', $args['referrer'])
@@ -779,6 +736,10 @@ class VisitorsModel extends BaseModel
 
     public function getVisitorData($args = [])
     {
+        if (! DatabaseFactory::compareCurrentVersion('14.12.6', '>=')) {
+            return LegacyModel::get('visitorData', $args, '14.12.4');
+        }
+
         $args = $this->parseArgs($args, [
             'fields'     => [],
             'visitor_id' => '',
@@ -804,7 +765,11 @@ class VisitorsModel extends BaseModel
             'visitor.referred',
             'visitor.source_channel',
             'visitor.source_name',
-            'visitor.ip'
+            'visitor.ip',
+            'visitor.first_page',
+            'visitor.first_view',
+            'visitor.last_page',
+            'visitor.last_view'
         ];
 
         // If visitor_id is empty, get visitor_id by IP
@@ -818,18 +783,6 @@ class VisitorsModel extends BaseModel
         }
 
         if ($args['page_info'])  {
-            $firstPage = Query::select(['MIN(ID)', 'page_id', 'visitor_id'])
-                ->from('visitor_relationships')
-                ->where('visitor_id', '=', $args['visitor_id'])
-                ->getQuery();
-
-            $firstView = Query::select(['MIN(date) as date', 'visitor_id'])
-                ->from('visitor_relationships')
-                ->where('visitor_id', '=', $args['visitor_id'])
-                ->getQuery();
-
-            $fields[] = 'first_view.date as first_view';
-            $fields[] = 'first_page.page_id as first_page';
             $fields[] = 'pages.uri as first_uri';
         }
 
@@ -846,9 +799,7 @@ class VisitorsModel extends BaseModel
 
         if ($args['page_info']) {
             $query
-                ->joinQuery($firstPage, ['visitor.ID', 'first_page.visitor_id'], 'first_page', 'LEFT')
-                ->joinQuery($firstView, ['visitor.ID', 'first_view.visitor_id'], 'first_view', 'LEFT')
-                ->join('pages', ['first_page.page_id', 'pages.page_id'], [], 'LEFT');
+                ->join('pages', ['first_page', 'pages.page_id'], [], 'LEFT');
         }
 
         if ($args['user_info']) {
@@ -861,7 +812,11 @@ class VisitorsModel extends BaseModel
                 ->decorate(VisitorDecorator::class);
         }
 
-        return $query->getRow();
+        $result = $query
+            ->allowCaching()
+            ->getRow();
+
+        return $result;
     }
 
     public function getVisitorJourney($args)
@@ -913,31 +868,33 @@ class VisitorsModel extends BaseModel
     public function getVisitorsGeoData($args = [])
     {
         $args = $this->parseArgs($args, [
-            'fields'      => [
+            'fields'        => [
                 'visitor.city as city',
                 'visitor.location as country',
                 'visitor.region as region',
                 'visitor.continent as continent',
-                'COUNT(visitor.ID) as visitors',
+                'COUNT(DISTINCT visitor.ID) as visitors',
                 'SUM(visitor.hits) as views', // All views are counted and results can't be filtered by author, post type, etc...
             ],
-            'date'        => '',
-            'country'     => '',
-            'city'        => '',
-            'region'      => '',
-            'continent'   => '',
-            'not_null'    => '',
-            'post_type'   => '',
-            'author_id'   => '',
-            'post_id'     => '',
-            'per_page'    => '',
-            'query_param' => '',
-            'taxonomy'    => '',
-            'term'        => '',
-            'page'        => 1,
-            'group_by'    => 'visitor.location',
-            'order_by'    => ['visitors', 'views'],
-            'order'       => 'DESC',
+            'date'          => '',
+            'country'       => '',
+            'city'          => '',
+            'region'        => '',
+            'continent'     => '',
+            'not_null'      => '',
+            'post_type'     => '',
+            'author_id'     => '',
+            'post_id'       => '',
+            'per_page'      => '',
+            'query_param'   => '',
+            'taxonomy'      => '',
+            'term'          => '',
+            'page'          => 1,
+            'group_by'      => 'visitor.location',
+            'event_name'    => '',
+            'event_target'  => '',
+            'order_by'      => ['visitors', 'views'],
+            'order'         => 'DESC',
         ]);
 
         $query = Query::select($args['fields'])
@@ -976,6 +933,13 @@ class VisitorsModel extends BaseModel
                 $query
                     ->joinQuery($taxQuery, ['posts.ID', 'tax.object_id'], 'tax');
             }
+        }
+
+        if (!empty($args['event_target']) || !empty($args['event_name'])) {
+            $query
+                ->join('events', ['events.visitor_id', 'visitor.ID'])
+                ->where('event_name', 'IN', $args['event_name'])
+                ->whereJson('event_data', 'target_url', '=', $args['event_target']);
         }
 
         $result = $query->getAll();
@@ -1216,11 +1180,16 @@ class VisitorsModel extends BaseModel
             'term_id'       => '',
         ]);
 
+        $range = DateRange::get('30days');
+
+        $startDate = $range['from'] . ' 00:00:00';
+        $endDate   = date('Y-m-d', strtotime($range['to'] . ' +1 day')) . ' 00:00:00';
+
         $fields = [
             '`visitor`.`last_counter` AS `date`',
             'COUNT(DISTINCT `visitor`.`ID`) AS `visitors`',
             '`visit`.`visit` AS `visits`',
-            'COUNT(DISTINCT CASE WHEN(`visitor`.`referred` NOT LIKE "%%' . Helper::get_domain_name(home_url()) . '%%" AND `visitor`.`referred` <> "") THEN `visitor`.`ID` END) AS `referrers`',
+            'COUNT(DISTINCT CASE WHEN(`visitor`.`referred` <> "") THEN `visitor`.`ID` END) AS `referrers`',
         ];
         if (is_numeric($args['post_id']) || !empty($args['author_id']) || !empty($args['term_id'])) {
             // For single pages/posts/authors/terms
@@ -1232,9 +1201,9 @@ class VisitorsModel extends BaseModel
             // For single pages/posts/authors/terms
             $query->join('visit', ['`visitor`.`last_counter`', '`visit`.`last_counter`']);
         }
-        $query
-            ->whereDate('`visitor`.`last_counter`', $args['date'])
-            ->groupBy('`visitor`.`last_counter`');
+        $query->where('visitor.last_counter', '>=', $startDate)
+            ->where('visitor.last_counter', '<', $endDate)
+            ->groupBy('visitor.last_counter');
 
         $filteredArgs = array_filter($args);
         if (array_intersect(['post_type', 'post_id', 'resource_type', 'author_id', 'taxonomy', 'term_id'], array_keys($filteredArgs))) {

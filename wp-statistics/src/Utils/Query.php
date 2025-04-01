@@ -61,6 +61,24 @@ class Query
         return $instance;
     }
 
+    public static function delete($table)
+    {
+        $instance            = new self();
+        $instance->operation = 'delete';
+        $instance->table     = $instance->getTable($table);
+
+        return $instance;
+    }
+
+    public static function insert($table)
+    {
+        $instance            = new self();
+        $instance->operation = 'insert';
+        $instance->table     = $instance->getTable($table);
+
+        return $instance;
+    }
+
     public static function union($queries)
     {
         $instance            = new self();
@@ -74,18 +92,42 @@ class Query
     {
         if (empty($values)) return $this;
 
-        foreach ($values as $field => $value) {
-            $column = '`' . str_replace('`', '``', $field) . '`';
+        if ($this->operation === 'update') {
+            foreach ($values as $field => $value) {
+                $column = '`' . str_replace('`', '``', $field) . '`';
 
-            if (is_string($value)) {
-                $this->setClauses[]      = "$column = %s";
-                $this->valuesToPrepare[] = $value;
-            } else if (is_numeric($value)) {
-                $this->setClauses[]      = "$column = %d";
-                $this->valuesToPrepare[] = $value;
-            } else if (is_null($value)) {
-                $this->setClauses[] = $column = NULL;
+                if (is_string($value)) {
+                    $this->setClauses[]      = "$column = %s";
+                    $this->valuesToPrepare[] = $value;
+                } else if (is_numeric($value)) {
+                    $this->setClauses[]      = "$column = %d";
+                    $this->valuesToPrepare[] = $value;
+                } else if (is_null($value)) {
+                    $this->setClauses[] = "$column = NULL";
+                }
             }
+        }
+
+        if ($this->operation === 'insert') {
+            $identifiers    = [];
+            $placeholders   = [];
+
+            $values = array_filter($values);
+
+            foreach ($values as $field => $value) {
+                $identifiers[]  = '%i';
+
+                if (is_string($value)) {
+                    $placeholders[] = '%s';
+                } else if (is_numeric($value)) {
+                    $placeholders[] = '%d';
+                }
+            }
+
+            $this->valuesToPrepare = array_merge(array_keys($values), array_values($values));
+
+            $this->setClauses['identifiers'] = $identifiers;
+            $this->setClauses['values']      = $placeholders;
         }
 
         return $this;
@@ -158,7 +200,10 @@ class Query
         }
 
         if (!empty($from) && !empty($to)) {
-            $condition                  = "DATE($field) BETWEEN %s AND %s";
+            if (strlen($from) === 10) $from .= ' 00:00:00';
+            if (strlen($to) === 10) $to .= ' 23:59:59';
+
+            $condition                  = "$field BETWEEN %s AND %s";
             $this->whereClauses[]       = $condition;
             $this->valuesToPrepare[]    = $from;
             $this->valuesToPrepare[]    = $to;
@@ -197,6 +242,27 @@ class Query
 
         // If the value is empty, we don't need to add it to the query (except for numbers)
         if (!is_numeric($value) && empty($value)) return $this;
+
+        $condition = $this->generateCondition($field, $operator, $value);
+
+        if (!empty($condition)) {
+            $this->whereClauses[]  = $condition['condition'];
+            $this->valuesToPrepare = array_merge($this->valuesToPrepare, $condition['values']);
+        }
+
+        return $this;
+    }
+
+    public function whereJson($field, $key, $operator, $value)
+    {
+        if (is_array($value)) {
+            $value = array_filter(array_values($value));
+        }
+
+        // If the value is empty, we don't need to add it to the query (except for numbers)
+        if (!is_numeric($value) && empty($value)) return $this;
+
+        $field = "JSON_UNQUOTE(JSON_EXTRACT($field, '$.{$key}'))";
 
         $condition = $this->generateCondition($field, $operator, $value);
 
@@ -681,6 +747,36 @@ class Query
         return $query;
     }
 
+    protected function deleteQuery()
+    {
+        $query = "DELETE FROM $this->table";
+
+        // Append WHERE clauses
+        $whereClauses = array_filter($this->whereClauses);
+        if (!empty($whereClauses)) {
+            $query .= ' WHERE ' . implode(" $this->whereRelation ", $whereClauses);
+        }
+
+        if (!empty($this->rawWhereClause)) {
+            $query .= empty($this->whereClauses) ? ' WHERE ' : ' ';
+            $query .= implode(' ', $this->rawWhereClause);
+        }
+
+        return $query;
+    }
+
+    protected function insertQuery()
+    {
+        $query = "INSERT INTO $this->table";
+
+        if (!empty($this->setClauses)) {
+            $query .= ' (' . implode(', ', $this->setClauses['identifiers']) . ') ';
+            $query .= ' VALUES (' . implode( ', ', $this->setClauses['values'] ) . ') ';
+        }
+
+        return $query;
+    }
+
     protected function unionQuery()
     {
         $query = '';
@@ -725,9 +821,12 @@ class Query
         return $this;
     }
 
-    public function removeTablePrefix($query)
+    public function removeTablePrefix($table)
     {
-        return str_replace([$this->db->prefix, 'statistics_'], '', $query);
+        $prefixLength   = strlen($this->db->prefix);
+        $table          = substr($table, $prefixLength);
+
+        return str_replace('statistics_', '', $table);
     }
 
     /**

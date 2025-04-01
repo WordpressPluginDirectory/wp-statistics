@@ -68,7 +68,6 @@ wps_js.formatNumber = function (num, fixed = 0) {
 wps_js.select2 = function () {
     jQuery("select[data-type-show=select2]").select2();
 }
-
 const wpsSelect2 = jQuery('.wps-select2');
 const wpsBody = jQuery('body');
 const wpsDropdown = jQuery('.wps-dropdown');
@@ -161,19 +160,18 @@ if (wpsSelect2.length) {
         wpsFilterVisitor.on('click', () => wpsSelect2.select2('open'));
     }
 }
-
 /**
  * Set Tooltip
  */
 wps_js.tooltip = function () {
     jQuery('.wps-tooltip').tooltipster({
-        theme: 'tooltipster-flat',
+        theme: 'tooltipster-shadow',
         contentCloning: true
     });
 
     jQuery('body').on('mouseenter touchstart', '.wps-tooltip:not(.tooltipstered)', function () {
         $(this).tooltipster({
-            theme: 'tooltipster-flat'
+            theme: 'tooltipster-shadow'
         }).tooltipster('open');
     });
 };
@@ -454,3 +452,7 @@ jQuery(document).ready(function () {
     }
 
 });
+
+window.renderFormatNum = function (data) {
+    return wps_js.formatNumber(data)
+}
