@@ -2,10 +2,9 @@
 
 namespace WP_Statistics\Service\Database\Managers;
 
-use WP_STATISTICS\Install;
+use WP_Statistics\Core\CoreFactory;
 use WP_STATISTICS\Option;
 use WP_Statistics\Service\Database\DatabaseFactory;
-use WP_Statistics\Service\Database\Migrations\Queue\QueueFactory;
 use WP_Statistics\Service\Database\Schema\Manager;
 
 
@@ -53,18 +52,23 @@ class TableHandler
 
         Option::saveOptionGroup('check', false, 'db');
 
-        if (Install::isFresh()) {
+        if (CoreFactory::isFresh()) {
             Option::saveOptionGroup('migrated', true, 'db');
             Option::saveOptionGroup('version', WP_STATISTICS_VERSION, 'db');
-            Option::saveOptionGroup('is_done', true, 'ajax_background_process');
             return;
         }
 
         Option::saveOptionGroup('migrated', false, 'db');
         Option::saveOptionGroup('migration_status_detail', null, 'db');
-        Option::saveOptionGroup('is_done', null, 'ajax_background_process');
-        Option::saveOptionGroup('status', null, 'ajax_background_process');
         Option::saveOptionGroup('completed', false, 'queue_background_process');
+        Option::saveOptionGroup('status', null, 'queue_background_process');
+
+        $ajaxMigrationOption = Option::getOptionGroup('ajax_background_process', 'jobs', []);
+        $ajaxIsDone          = Option::getOptionGroup('ajax_background_process', 'is_done', false);
+
+        if ($ajaxIsDone || in_array('visitor_columns_migrate', $ajaxMigrationOption, true)) {
+            Option::saveOptionGroup('visitor_columns_migrator_initiated', true, 'jobs');
+        }
 
         $dismissedNotices = get_option('wp_statistics_dismissed_notices', []);
 
