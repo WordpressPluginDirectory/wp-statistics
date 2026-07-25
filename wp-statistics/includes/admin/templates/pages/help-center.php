@@ -20,7 +20,7 @@ $notificationCount       = NotificationFactory::getNewNotificationCount();
                 <a class="wps-help__notification js-wps-open-notification wps-notifications--has-items">
                     <span class="wps-help__notification__dot"></span>
                     <span class="wps-help__notification__text">
-                        <?php echo sprintf(_n('You have %s notification', 'You have %s notifications', $notificationCount, 'wp-statistics'), esc_html($notificationCount)); ?>
+                        <?php /* translators: %s: string value */ echo sprintf(_n('You have %s notification', 'You have %s notifications', $notificationCount, 'wp-statistics'), esc_html($notificationCount)); ?>
                     </span>
                 </a>
             <?php endif; ?>
@@ -30,6 +30,7 @@ $notificationCount       = NotificationFactory::getNewNotificationCount();
             <p class="wps-help__description">
                 <?php
                 printf(
+                    /* translators: %1$s: string value, %2$s: string value, %3$s: string value, %4$s: string value */
                     esc_html__('Please review the %1$sdocumentation%2$s first. If you still can’t find the answer, open a %3$ssupport ticket%4$s and we will be happy to answer your questions and assist you with any problems.', 'wp-statistics'),
                     '<a href="https://wp-statistics.com/documentation/?utm_source=wp-statistics&utm_medium=link&utm_campaign=help" target="_blank">',
                     '</a>',
@@ -152,7 +153,7 @@ $notificationCount       = NotificationFactory::getNewNotificationCount();
                 'category'        => esc_html__('FEATURE REQUESTS', 'wp-statistics'),
                 'title'           => esc_html__('Help Shape The Future.', 'wp-statistics'),
                 'view_more_title' => esc_html__('Submit Request', 'wp-statistics'),
-                'view_more_link'  => 'https://feedback.veronalabs.com/boards/wp-statistics',
+                'view_more_link'  => 'https://github.com/wp-statistics/wp-statistics/issues/new/choose',
                 'description'     => esc_html__('Submit your ideas or vote on features requested by others. Your feedback helps us improve WP Statistics based on what matters most to you.', 'wp-statistics')
             ];
 
@@ -163,7 +164,7 @@ $notificationCount       = NotificationFactory::getNewNotificationCount();
                 'category'        => esc_html__('REVIEWS', 'wp-statistics'),
                 'title'           => esc_html__('Leave Us a Review.', 'wp-statistics'),
                 'view_more_title' => esc_html__('Leave a Review', 'wp-statistics'),
-                'view_more_link'  => 'https://wordpress.org/support/plugin/wp-statistics/reviews/?filter=5#new-post',
+                'view_more_link'  => 'https://wordpress.org/plugins/wp-statistics/#reviews',
                 'description'     => esc_html__('Love WP Statistics? Post a public review so other WordPress users can discover the plugin’s benefits.', 'wp-statistics')
             ];
 
@@ -202,7 +203,7 @@ $notificationCount       = NotificationFactory::getNewNotificationCount();
         } else {
             $cta = [
                 'cta_title'   => esc_html__('Submit a Feature Request', 'wp-statistics'),
-                'cta_link'    => 'https://feedback.veronalabs.com/boards/wp-statistics',
+                'cta_link'    => 'https://github.com/wp-statistics/wp-statistics/issues/new/choose',
                 'title'       => esc_html__('Got Ideas for New Features?', 'wp-statistics'),
                 'description' => esc_html__('We’re building WP Statistics with you in mind. Share your suggestions or upvote existing ones to help shape what comes next.', 'wp-statistics')
             ];

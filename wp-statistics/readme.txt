@@ -4,7 +4,7 @@ Donate link: https://wp-statistics.com/donate/
 Tags: analytics, google analytics, insights, stats, site visitors
 Requires at least: 6.6
 Tested up to: 7.0
-Stable tag: 14.16.5
+Stable tag: 14.16.10
 Requires PHP: 7.4
 License: GPL-2.0+
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -146,6 +146,35 @@ To ensure the plugin works correctly, please clear your cache because some reque
 Update add-ons DataPlus, Advanced Reporting, and Mini-Chart to the latest version.
 
 == Changelog ==
+= 14.16.10 - 2026-07-25 =
+- **Fix:** Prevented a fatal error on the tracking request when the referrer parameter was sent as an array instead of a single value.
+- **Enhancement:** General security hardening and internal improvements.
+
+= 14.16.9 - 2026-07-21 =
+- **Fix:** Content Analytics no longer adds the site-wide historical baseline into each post's Total Views, so per-post totals are accurate again (issue [#1097](https://github.com/wp-statistics/wp-statistics/issues/1097)).
+- **Fix:** Prevented a fatal error on admin load when license validation fails or the license key is empty.
+- **Enhancement:** Hardened input handling and output escaping across the visitor and referral reports.
+
+= 14.16.8 - 2026-05-19 =
+- **Enhancement:** Hardened input handling across admin AJAX endpoints, the dynamic query builder, the referrer pipeline, and the GeoIP download URL.
+- **Enhancement:** Removed the bundled moment.min.js in favor of the copy shipped with WordPress core.
+- **Enhancement:** Added direct-file-access guards, switched date() calls to gmdate(), and routed parse_url() through wp_parse_url().
+- **Enhancement:** Normalized translator placeholders and text domains; routed translated UI strings through escape/kses functions.
+- **Enhancement:** Replaced direct unlink() calls in plugin code with wp_delete_file().
+
+= 14.16.7 - 2026-05-12 =
+- **Enhancement:** Hardened escaping and sanitization in device reports.
+- **Enhancement:** Tracking endpoints now send noindex and no-cache headers to prevent "ghost pages" in Google Search Console.
+- **Fix:** Stopped GeoLite2-City background downloads on Cloudflare IP Geolocation sites (issue [#1093](https://github.com/wp-statistics/wp-statistics/issues/1093)).
+- **Fix:** "Bypass Ad Blockers" no longer copies the tracker into uploads, improving compatibility with hardened hosting.
+- **Fix:** **Run Migration** button stays clickable during an active migration to recover stuck queues.
+- **Deprecated:** `wp_statistics_hashed_asset_root` and `wp_statistics_hashed_asset_dir` filters; will be removed in a future release.
+
+= 14.16.6 - 2026-04-16 =
+- **Fix:** Removed legacy TinyMCE integration that caused "Failed to load plugin" errors in the classic editor, especially with themes like Corvix and Avada.
+- **Fix:** Excluded browser prefetch and prerender requests that were inflating visit counts.
+- **Fix:** Excluded headless browsers and automation tools (Headless Chrome, PhantomJS, Puppeteer, Playwright, Selenium) that were being counted as real visitors.
+
 = 14.16.5 - 2026-04-11 =
 - **Enhancement:** Simplify WP Consent API consent level logic.
 - **Enhancement:** Hardened plugin security and improvement

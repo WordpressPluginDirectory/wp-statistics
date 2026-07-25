@@ -2,9 +2,12 @@
 
 namespace WP_Statistics\Service\Database\Migrations\BackgroundProcess\Jobs;
 
+if (!defined('ABSPATH')) exit; // Exit if accessed directly
+
 use WP_Statistics\Abstracts\BaseBackgroundProcess;
 use WP_Statistics\Decorators\VisitorDecorator;
 use WP_STATISTICS\Menus;
+use WP_STATISTICS\Option;
 use WP_Statistics\Models\VisitorsModel;
 use WP_Statistics\Service\Admin\NoticeHandler\Notice;
 use WP_Statistics\Service\Geolocation\GeolocationFactory;
@@ -63,6 +66,16 @@ class IncompleteGeoIpUpdater extends BaseBackgroundProcess
      */
     protected function task($item)
     {
+        // CF headers are not available in cron, so this job uses MaxMind as
+        // the server-side fallback. On cf-mode sites without the mmdb on
+        // disk, skip rather than backfill rows with default-location data
+        // (issue #1093).
+        if (Option::get('geoip_location_detection_method', 'maxmind') === 'cf' &&
+            !(new MaxmindGeoIPProvider())->isDatabaseExist()) {
+            $this->setProcessed($item['visitors']);
+            return false;
+        }
+
         $visitors     = $item['visitors'];
         $visitorModel = new VisitorsModel();
 
@@ -125,6 +138,7 @@ class IncompleteGeoIpUpdater extends BaseBackgroundProcess
         $actionUrl = $this->getActionUrl($force);
 
         $message = sprintf(
+            /* translators: %s: string value */
             __('Detected visitors without location data. Please <a href="%s">click here</a> to update the geographic data in the background. This is necessary for accurate analytics.', 'wp-statistics'),
             esc_url($actionUrl),
             '' // compatibility with old translations

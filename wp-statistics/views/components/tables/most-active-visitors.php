@@ -73,14 +73,14 @@ use WP_Statistics\Utils\Url;
                                 ]);
                                 ?>
 
-                                <?php $campaign = Url::getParam('?' . $firstPage['query'], 'utm_campaign'); ?>
+                                <?php $campaign = sanitize_text_field((string) Url::getParam('?' . $firstPage['query'], 'utm_campaign')); ?>
                                 <?php if ($campaign) : ?>
                                     <span class="wps-campaign-label wps-tooltip" title="<?php echo esc_attr__('Campaign:', 'wp-statistics') . ' ' . esc_attr($campaign); ?>"><?php echo esc_html($campaign); ?></span>
                                 <?php endif; ?>
                             </div>
                         <?php
                         else :
-                            echo Admin_Template::UnknownColumn();
+                            echo Admin_Template::UnknownColumn(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
                         endif;
                         ?>
                     </td>
@@ -96,7 +96,7 @@ use WP_Statistics\Utils\Url;
                                 'title' => $lastPage['title'],
                             ]);
                         else :
-                            echo Admin_Template::UnknownColumn();
+                            echo Admin_Template::UnknownColumn(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
                         endif;
                         ?>
                     </td>

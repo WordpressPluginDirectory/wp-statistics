@@ -5,6 +5,7 @@ use Exception;
 use WP_Statistics\Models\EventsModel;
 use WP_Statistics\Utils\Request;
 use WP_Statistics\Components\Ajax;
+use WP_Statistics\Components\TrackingResponse;
 use WP_STATISTICS\Exclusion;
 use WP_Statistics\Service\Analytics\VisitorProfile;
 
@@ -20,11 +21,13 @@ class CustomEventActions
 
     public function insertCustomEvent()
     {
+        TrackingResponse::sendHeaders();
+
         try {
             $nonce = Request::get('nonce');
 
             if (!wp_verify_nonce($nonce, 'wp_statistics_custom_event')) {
-                throw new Exception(esc_html__('Access denied.', 'wp-statistics-marketing'));
+                throw new Exception(esc_html__('Access denied.', 'wp-statistics'));
             }
 
             $GLOBALS['wp_statistics_user_id'] = get_current_user_id();

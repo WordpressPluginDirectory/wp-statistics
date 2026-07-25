@@ -2,6 +2,8 @@
 
 namespace WP_STATISTICS;
 
+if (!defined('ABSPATH')) exit; // Exit if accessed directly
+
 use Exception;
 use WP_Statistics\Components\Singleton;
 use WP_Statistics\Service\Analytics\VisitorProfile;
@@ -34,7 +36,15 @@ class Hits extends Singleton
     public function __construct()
     {
 
-        // Sanitize Hit Data if Has Rest-Api Process
+        // Sanitize Hit Data if Has Rest-Api Process.
+        //
+        // The client-data filters are installed here, but whether the
+        // client-supplied page identity is actually trusted is decided at record
+        // time inside the filter callbacks (set_current_page / set_page_uri),
+        // where the signature is verified. Deciding it here would be too early:
+        // the constructor runs on plugins_loaded, before a theme/init-registered
+        // wp_statistics_request_signature_enabled filter is in effect, so an
+        // early signature check could wrongly discard a legitimate page.
         if (self::is_rest_hit()) {
 
             // Get Hit Data
@@ -63,12 +73,20 @@ class Hits extends Singleton
      */
     public function set_current_page($current_page)
     {
+        // Only trust client-supplied page identity when the request carries a
+        // valid signature. Verified here, at record time, so a late-registered
+        // wp_statistics_request_signature_enabled filter is honoured and an
+        // unsigned/spoofed request cannot inject a page identity.
+        if (!Helper::verifyHitSignature()) {
+            return $current_page;
+        }
+
         /**
          * Filter to resolve page type and ID from URL for SPA tracking.
          *
          * @param string $pageUri The page URI (decoded)
          */
-        $pageUri  = isset($this->rest_hits->page_uri) ? base64_decode($this->rest_hits->page_uri) : '';
+        $pageUri  = (isset($this->rest_hits->page_uri) && is_string($this->rest_hits->page_uri)) ? sanitize_url(base64_decode($this->rest_hits->page_uri)) : '';
         $resolved = apply_filters('wp_statistics_resolve_page_from_uri', $pageUri);
 
         if (is_array($resolved) && isset($resolved['type']) && $resolved['type'] !== 'unknown') {
@@ -99,7 +117,13 @@ class Hits extends Singleton
      */
     public function set_page_uri($page_uri)
     {
-        return isset($this->rest_hits->page_uri) ? base64_decode($this->rest_hits->page_uri) : $page_uri;
+        // Only trust the client-supplied page URI when the request is signed
+        // (verified at record time, mirroring set_current_page).
+        if (!Helper::verifyHitSignature()) {
+            return $page_uri;
+        }
+
+        return (isset($this->rest_hits->page_uri) && is_string($this->rest_hits->page_uri)) ? sanitize_url(base64_decode($this->rest_hits->page_uri)) : $page_uri;
     }
 
     /**
@@ -172,6 +196,7 @@ class Hits extends Singleton
             Exclusion::record($exclusion);
             self::errorListener();
 
+            // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- internal exception, message is not rendered to HTML
             throw new Exception($exclusion['exclusion_reason'], 200);
         }
 

@@ -55,7 +55,7 @@ $databaseStatus    = $schemaCheckResult['status'] ?? null;
 
                 <td>
                     <button id="populate-source-channel-submit" class="wps-button wps-button--danger-outline wps-mt-0" type="button" value="1" name="populate-source-channel-submit"><?php esc_html_e('Update Source Channel', 'wp-statistics'); ?></button>
-                    <p class="description"><?php _e('This action updates and corrects any unidentified source channels in the database. Please be patient, as this process might take some time depending on the amount of data. <br> <i>Note: The accuracy of the results may be affected as we only retain whitelisted query parameters.</i>', 'wp-statistics'); ?></p>
+                    <p class="description"><?php echo wp_kses_post(__('This action updates and corrects any unidentified source channels in the database. Please be patient, as this process might take some time depending on the amount of data. <br> <i>Note: The accuracy of the results may be affected as we only retain whitelisted query parameters.</i>', 'wp-statistics')); ?></p>
                     <div id="populate-source-channel-result" class="wps-mt-12"></div>
                 </td>
             </tr>
@@ -177,8 +177,6 @@ $databaseStatus    = $schemaCheckResult['status'] ?? null;
                         $jobInstance = new $job();
                         $jobInstance->localizeJobTexts();
 
-                        $isActive = $jobInstance->is_active();
-
                         $label                = $jobInstance->getJobTitle();
                         $btnLabel             = $jobInstance->getJobButtonTitle();
                         $requiresConfirmation = $jobInstance->isConfirmationRequired() ? '1' : '0';
@@ -189,10 +187,9 @@ $databaseStatus    = $schemaCheckResult['status'] ?? null;
                             </th>
                             <td>
                                 <a
-                                    class="button wps-button wps-button--primary wps-mt-0 wps-migration-btn <?php echo !empty($isActive) ? 'disabled' : ''; ?>"
+                                    class="button wps-button wps-button--primary wps-mt-0 wps-migration-btn"
                                     title="<?php echo esc_html($label); ?>"
-                                    href="<?php echo !empty($isActive) ? '#' : esc_url($jobInstance->getActionUrl(true)); ?>"
-                                    aria-disabled="<?php echo !empty($isActive) ? 'true' : 'false'; ?>"
+                                    href="<?php echo esc_url($jobInstance->getActionUrl(true)); ?>"
                                     data-confirmation="<?php echo esc_attr($requiresConfirmation); ?>"
                                 >
                                     <?php echo !empty($btnLabel) ? esc_html($btnLabel) : esc_html__('Run Migration', 'wp-statistics'); ?>

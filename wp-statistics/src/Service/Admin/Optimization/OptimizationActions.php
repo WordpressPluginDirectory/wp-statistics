@@ -23,6 +23,8 @@ class OptimizationActions
 {
     use AjaxUtilityTrait;
 
+    const NONCE_ACTION = 'wp_statistics_optimization';
+
     public function register()
     {
         Ajax::register('purge_old_data', [$this, 'purgeOldData'], false);
@@ -47,7 +49,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             $purgeDays = Request::get('purge-days', 0, 'number');
@@ -71,7 +73,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             $hits     = Request::get('purge-hits');
@@ -117,6 +119,7 @@ class OptimizationActions
                 throw new Exception('Could not purge visitors. Please try again.', 500);
             }
 
+            /* translators: %s: string value */
             Ajax::success(sprintf(esc_html__('Removed %s visitors.', 'wp-statistics'), "<code>$result</code>"));
         } catch (Exception $e) {
             Ajax::error($e->getMessage(), null, $e->getCode());
@@ -130,7 +133,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             $result = Query::update('visitor')
@@ -154,7 +157,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             $result = Query::update('visitor')
@@ -178,7 +181,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             Option::deleteOptionGroup('word_count_process_initiated', 'jobs');
@@ -204,7 +207,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             // Get allowed query params
@@ -239,7 +242,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             $eventName = Request::get('event_name');
@@ -255,6 +258,7 @@ class OptimizationActions
                 throw new Exception('Could not remove event data. Please try again.', 500);
             }
 
+            /* translators: %s: string value */
             Ajax::success(sprintf(esc_html__('Event data removed for %s', 'wp-statistics'), "<code>$eventName</code>"));
         } catch (Exception $e) {
             Ajax::error($e->getMessage(), null, $e->getCode());
@@ -268,7 +272,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             $providerMap = [
@@ -277,8 +281,6 @@ class OptimizationActions
             ];
 
             $method   = Option::get('geoip_location_detection_method', 'maxmind');
-            $method   = false;
-
             $provider = $providerMap[$method] ?? $providerMap['maxmind'];
 
             // First download/update the GeoIP database
@@ -289,6 +291,7 @@ class OptimizationActions
 
             Ajax::success(esc_html__('GeoIP update started.', 'wp-statistics'));
         } catch (Exception $e) {
+            /* translators: %s: string value */
             Ajax::error(sprintf(esc_html__('GeoIP update failed: %s', 'wp-statistics'), $e->getMessage()), null, $e->getCode());
         }
     }
@@ -300,13 +303,14 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             BackgroundProcessFactory::getBackgroundProcess('update_visitors_source_channel')->process();
 
             Ajax::success(esc_html__('Source channel update started.', 'wp-statistics'));
         } catch (Exception $e) {
+            /* translators: %s: string value */
             Ajax::error(sprintf(esc_html__('Source channel update failed: %s', 'wp-statistics'), $e->getMessage()), null, $e->getCode());
         }
     }
@@ -319,13 +323,15 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             $result = IP::Update_HashIP_Visitor();
 
+            /* translators: %d: number value */
             Ajax::success(sprintf(esc_html__('Anonymized `%d` IP addresses.', 'wp-statistics'), $result));
         } catch (Exception $e) {
+            /* translators: %s: string value */
             Ajax::error(sprintf(esc_html__('IP anonymization failed: %s', 'wp-statistics'), $e->getMessage()), null, $e->getCode());
         }
     }
@@ -337,7 +343,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             $schemaCheckResult = SchemaMaintainer::check(true);
@@ -360,7 +366,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wp_rest', 'wps_nonce');
+            $this->checkAdminReferrer(self::NONCE_ACTION, 'wps_nonce');
             $this->checkCapability('manage');
 
             $schemaRepairResult = SchemaMaintainer::repair();
@@ -372,6 +378,7 @@ class OptimizationActions
 
             Ajax::success(esc_html__('Database schema issues were repaired.', 'wp-statistics'));
         } catch (Exception $e) {
+            /* translators: %s: string value */
             Ajax::error(sprintf(esc_html__('Failed to repair database schema: %s', 'wp-statistics'), $e->getMessage()), null, $e->getCode());
         }
     }
@@ -383,7 +390,7 @@ class OptimizationActions
     {
         try {
             $this->verifyAjaxRequest();
-            $this->checkAdminReferrer('wps_optimization');
+            $this->checkAdminReferrer(self::NONCE_ACTION);
             $this->checkCapability('manage');
 
             $visitors = Request::get('visitors', 0, 'number');
